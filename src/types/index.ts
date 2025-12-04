@@ -1,6 +1,6 @@
 // Types globaux pour le jeu
 
-export type BuildingType = 'chicken_coop' | 'feed_mill' | 'egg_processor' | 'warehouse'
+export type BuildingType = 'farm_building' | 'feed_mill' | 'processor' | 'warehouse'
 
 export interface Building {
   id: string

@@ -99,7 +99,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'poules-tycoon-save', // Nom de la clé dans localStorage
+      name: 'tycoon-game-save', // Nom de la clé dans localStorage
     }
   )
 )
