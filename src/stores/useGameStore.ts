@@ -9,6 +9,7 @@ import {
   CLASSROOM_PCS,
   GYM_LEVELS,
   GYM_ACTIVITIES,
+  RESEARCH_LAB_LEVELS,
   DEFAULT_MAP
 } from '../config/gameConfig';
 
@@ -35,6 +36,11 @@ interface GymProfile {
     frequency: string;
 }
 
+interface GlobalModifiers {
+    co2Reduction: number; // 0.0 to 1.0 (percentage reduced)
+    costReduction: number; // 0.0 to 1.0 (percentage reduced)
+}
+
 interface GameState {
   money: number;
   research: number;
@@ -47,10 +53,13 @@ interface GameState {
   serverRoomLevel: number;
   classroomLevel: number;
   gymLevel: number;
+  researchLabLevel: number; // New
   
   unlockedTechs: string[];
+  globalModifiers: GlobalModifiers; // New
+
   serverSlots: (ServerSlot | null)[];
-  classroomSlots: (ClassroomPCSlot | null)[]; // New
+  classroomSlots: (ClassroomPCSlot | null)[];
   
   // Gym
   gymProfile: GymProfile | null;
@@ -63,7 +72,7 @@ interface GameState {
   // Computed
   energyCapacity: number;
   energyUsage: number;
-  studentCount: number; // Visual only now
+  studentCount: number;
 
   // Actions
   setInspectedRoomId: (id: string | null) => void;
@@ -74,6 +83,7 @@ interface GameState {
   upgradeServerRoom: () => void;
   upgradeClassroom: () => void;
   upgradeGym: () => void;
+  upgradeResearchLab: () => void; // New
   
   setGymProfile: (profile: GymProfile) => void;
   performGymActivity: () => void;
@@ -82,8 +92,8 @@ interface GameState {
   buyServer: (typeId: string) => void;
   upgradeServer: (slotIndex: number) => void;
   
-  buyClassroomPC: (slotIndex: number) => void; // New
-  upgradeClassroomPC: (slotIndex: number) => void; // New
+  buyClassroomPC: (slotIndex: number) => void;
+  upgradeClassroomPC: (slotIndex: number) => void;
 
   tickUpdate: () => void;
 }
@@ -99,10 +109,13 @@ export const useGameStore = create<GameState>((set, get) => ({
   serverRoomLevel: 1,
   classroomLevel: 1,
   gymLevel: 1,
+  researchLabLevel: 1,
   
   unlockedTechs: ['T1'],
+  globalModifiers: { co2Reduction: 0, costReduction: 0 },
+
   serverSlots: [null, null],
-  classroomSlots: new Array(CLASSROOM_LEVELS[0].capacity).fill(null), // Start empty slots
+  classroomSlots: new Array(CLASSROOM_LEVELS[0].capacity).fill(null),
   
   gymProfile: null,
 
@@ -137,14 +150,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeGenerator: () => {
-    const { money, generatorLevel } = get();
+    const { money, generatorLevel, globalModifiers } = get();
     if (generatorLevel >= 10) return;
 
     const nextLevel = GENERATOR_LEVELS[generatorLevel]; 
-    
-    if (money >= nextLevel.cost) {
+    const cost = nextLevel.cost * (1 - globalModifiers.costReduction);
+
+    if (money >= cost) {
       set({
-        money: money - nextLevel.cost,
+        money: money - cost,
         generatorLevel: generatorLevel + 1,
         energyCapacity: nextLevel.capacity,
       });
@@ -152,13 +166,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeServerRoom: () => {
-    const { money, serverRoomLevel, unlockedTechs, energyCapacity } = get();
+    const { money, serverRoomLevel, unlockedTechs, energyCapacity, globalModifiers } = get();
     if (serverRoomLevel >= 10) return;
 
     const nextLevelConfig = SERVER_ROOM_LEVELS[serverRoomLevel]; 
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction);
 
     // Checks
-    if (money < nextLevelConfig.cost) return;
+    if (money < cost) return;
     if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) return;
     if (energyCapacity < nextLevelConfig.energyReq) return; 
 
@@ -170,19 +185,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     set({
-      money: money - nextLevelConfig.cost,
+      money: money - cost,
       serverRoomLevel: serverRoomLevel + 1,
       serverSlots: newSlots,
     });
   },
 
   upgradeClassroom: () => {
-    const { money, classroomLevel, classroomSlots } = get();
+    const { money, classroomLevel, classroomSlots, globalModifiers } = get();
     if (classroomLevel >= 5) return;
 
     const nextLevel = CLASSROOM_LEVELS[classroomLevel]; 
+    const cost = nextLevel.cost * (1 - globalModifiers.costReduction);
     
-    if (money >= nextLevel.cost) {
+    if (money >= cost) {
         // Resize slots
         const newSlots = new Array(nextLevel.capacity).fill(null);
         for(let i=0; i<classroomSlots.length; i++) {
@@ -190,7 +206,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
 
         set({
-            money: money - nextLevel.cost,
+            money: money - cost,
             classroomLevel: classroomLevel + 1,
             classroomSlots: newSlots
         });
@@ -198,19 +214,35 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeGym: () => {
-    const { money, gymLevel, gymProfile } = get();
+    const { money, gymLevel, gymProfile, globalModifiers } = get();
     if (gymLevel >= 4) return;
     
     if (gymLevel === 1 && !gymProfile) return;
 
     const nextLevel = GYM_LEVELS[gymLevel]; 
+    const cost = nextLevel.cost * (1 - globalModifiers.costReduction);
     
-    if (money >= nextLevel.cost) {
+    if (money >= cost) {
         set({
-            money: money - nextLevel.cost,
+            money: money - cost,
             gymLevel: gymLevel + 1,
         });
     }
+  },
+
+  upgradeResearchLab: () => {
+      const { money, researchLabLevel, globalModifiers } = get();
+      if (researchLabLevel >= 5) return;
+
+      const nextLevel = RESEARCH_LAB_LEVELS[researchLabLevel];
+      const cost = nextLevel.cost * (1 - globalModifiers.costReduction);
+
+      if (money >= cost) {
+          set({
+              money: money - cost,
+              researchLabLevel: researchLabLevel + 1
+          });
+      }
   },
 
   setGymProfile: (profile) => {
@@ -232,22 +264,33 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   unlockTech: (techId) => {
-    const { money, unlockedTechs } = get();
+    const { research, unlockedTechs, globalModifiers } = get();
     if (unlockedTechs.includes(techId)) return;
 
     const tech = TECH_TREE.find(t => t.id === techId);
     if (!tech) return;
 
-    if (money >= tech.cost) {
+    if (research >= tech.cost) {
+        // Apply effects
+        const newModifiers = { ...globalModifiers };
+        tech.effects.forEach(effect => {
+            if (effect.type === 'CO2_REDUCTION') {
+                newModifiers.co2Reduction += Number(effect.value);
+            } else if (effect.type === 'COST_REDUCTION') {
+                newModifiers.costReduction += Number(effect.value);
+            }
+        });
+
         set({
-            money: money - tech.cost,
-            unlockedTechs: [...unlockedTechs, techId]
+            research: research - tech.cost,
+            unlockedTechs: [...unlockedTechs, techId],
+            globalModifiers: newModifiers
         });
     }
   },
 
   buyServer: (typeId) => {
-    const { money, serverSlots, serverRoomLevel } = get();
+    const { money, serverSlots, serverRoomLevel, globalModifiers } = get();
     
     const emptyIndex = serverSlots.findIndex(s => s === null);
     if (emptyIndex === -1) return;
@@ -255,20 +298,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     const assetConfig = SERVER_ASSETS[typeId];
     if (!assetConfig) return;
 
+    const cost = assetConfig.baseCost * (1 - globalModifiers.costReduction);
+
     if (serverRoomLevel < assetConfig.minRoomLevel) return;
-    if (money < assetConfig.baseCost) return;
+    if (money < cost) return;
 
     const newSlots = [...serverSlots];
     newSlots[emptyIndex] = { typeId, grade: 1 };
 
     set({
-        money: money - assetConfig.baseCost,
+        money: money - cost,
         serverSlots: newSlots
     });
   },
 
   upgradeServer: (slotIndex) => {
-    const { money, serverSlots } = get();
+    const { money, serverSlots, globalModifiers } = get();
     const slot = serverSlots[slotIndex];
     if (!slot) return;
 
@@ -279,47 +324,49 @@ export const useGameStore = create<GameState>((set, get) => ({
     const gradeConfig = assetConfig.grades.find(g => g.grade === nextGrade);
     if (!gradeConfig) return;
 
-    if (money >= gradeConfig.upgradeCost) {
+    const cost = gradeConfig.upgradeCost * (1 - globalModifiers.costReduction);
+
+    if (money >= cost) {
         const newSlots = [...serverSlots];
         newSlots[slotIndex] = { ...slot, grade: nextGrade };
         set({
-            money: money - gradeConfig.upgradeCost,
+            money: money - cost,
             serverSlots: newSlots
         });
     }
   },
 
   buyClassroomPC: (slotIndex) => {
-      const { money, classroomSlots } = get();
-      if (classroomSlots[slotIndex]) return; // Already occupied
+      const { money, classroomSlots, globalModifiers } = get();
+      if (classroomSlots[slotIndex]) return; 
 
-      const pcConfig = CLASSROOM_PCS[0]; // Level 1: PC Patate
-      if (money >= pcConfig.cost) {
+      const pcConfig = CLASSROOM_PCS[0]; 
+      const cost = pcConfig.cost * (1 - globalModifiers.costReduction);
+
+      if (money >= cost) {
           const newSlots = [...classroomSlots];
           newSlots[slotIndex] = { level: 1 };
           set({
-              money: money - pcConfig.cost,
+              money: money - cost,
               classroomSlots: newSlots
           });
       }
   },
 
   upgradeClassroomPC: (slotIndex) => {
-      const { money, classroomSlots } = get();
+      const { money, classroomSlots, globalModifiers } = get();
       const slot = classroomSlots[slotIndex];
       if (!slot) return;
       if (slot.level >= 10) return;
 
-      const nextLevelConfig = CLASSROOM_PCS[slot.level]; // Index matches next level (0-based array vs 1-based level)
-      // CLASSROOM_PCS[0] is Lvl 1. CLASSROOM_PCS[1] is Lvl 2.
-      // If current is Lvl 1, next is Lvl 2 (index 1).
-      // So index = slot.level.
+      const nextLevelConfig = CLASSROOM_PCS[slot.level]; 
+      const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction);
 
-      if (money >= nextLevelConfig.cost) {
+      if (money >= cost) {
           const newSlots = [...classroomSlots];
           newSlots[slotIndex] = { level: slot.level + 1 };
           set({
-              money: money - nextLevelConfig.cost,
+              money: money - cost,
               classroomSlots: newSlots
           });
       }
@@ -341,6 +388,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       });
 
+      // Apply CO2 Reduction from Techs
+      totalCo2 = totalCo2 * (1 - state.globalModifiers.co2Reduction);
+
       const roomConfig = SERVER_ROOM_LEVELS[state.serverRoomLevel - 1];
       const taxAmount = grossServerIncome * roomConfig.taxRate;
       const netServerIncome = grossServerIncome - taxAmount;
@@ -359,6 +409,10 @@ export const useGameStore = create<GameState>((set, get) => ({
           }
       });
 
+      // Research Lab Income
+      const researchConfig = RESEARCH_LAB_LEVELS[state.researchLabLevel - 1];
+      const researchIncome = researchConfig.rpGeneration;
+
       // Total Energy Usage
       const currentEnergyUsage = roomConfig.energyReq + classroomEnergy;
 
@@ -371,10 +425,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       return {
         tick: state.tick + 1,
         money: state.money + finalIncome,
+        research: state.research + (isPowered ? researchIncome : 0), // Lab needs power? Let's assume yes for now, or maybe it's separate. Let's assume it needs power to function if we want to be strict, but for now let's just give it. Actually, let's make it depend on global power.
         co2: state.co2 + totalCo2,
         energyCapacity: currentCapacity,
         energyUsage: currentEnergyUsage,
-        studentCount: visualStudents // Update visual count based on active PCs
+        studentCount: visualStudents 
       };
     });
   },

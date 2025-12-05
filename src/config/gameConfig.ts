@@ -107,22 +107,45 @@ export const SERVER_ASSETS: Record<string, ServerAssetType> = {
 };
 
 // --- 4. TECH TREE ---
+export type TechEffectType = 'UNLOCK_ROOM_LEVEL' | 'CO2_REDUCTION' | 'COST_REDUCTION' | 'UNLOCK_FEATURE';
+
+export interface TechEffect {
+    type: TechEffectType;
+    value: number | string; // e.g. 0.1 for 10% reduction, or 'server_room_3'
+    target?: string; // e.g. 'server_room'
+}
+
 export interface TechNode {
   id: string;
   name: string;
   cost: number;
   description: string;
+  category: 'INFRA' | 'ECOLOGY' | 'ECONOMY';
+  effects: TechEffect[];
+  req?: string; // Prerequisite tech ID
 }
 
 export const TECH_TREE: TechNode[] = [
-  { id: 'T1', name: 'Réseau Basique', cost: 0, description: 'Débloque Server Room Niv 1' },
-  { id: 'T2', name: 'Active Directory', cost: 1000, description: 'Débloque Server Room Niv 3' },
-  { id: 'T3', name: 'Virtualisation', cost: 5000, description: 'Débloque Server Room Niv 5' },
-  { id: 'T4', name: 'Conteneurisation', cost: 10000, description: 'Débloque Server Room Niv 6' },
-  { id: 'T5', name: 'Efficience Énergétique', cost: 20000, description: 'Débloque Server Room Niv 7' },
-  { id: 'T6', name: 'Cloud Hybride', cost: 40000, description: 'Débloque Server Room Niv 8' },
-  { id: 'T7', name: 'Refroidissement Liquide', cost: 80000, description: 'Débloque Server Room Niv 9' },
-  { id: 'T8', name: 'Stabilité Quantique', cost: 200000, description: 'Débloque Server Room Niv 10' },
+  // INFRASTRUCTURE (Server Room Unlocks)
+  { id: 'T1', name: 'Réseau Basique', cost: 0, description: 'Débloque Server Room Niv 1', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 1, target: 'server' }] },
+  { id: 'T2', name: 'Active Directory', cost: 1000, description: 'Débloque Server Room Niv 3', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 3, target: 'server' }], req: 'T1' },
+  { id: 'T3', name: 'Virtualisation', cost: 5000, description: 'Débloque Server Room Niv 5', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 5, target: 'server' }], req: 'T2' },
+  { id: 'T4', name: 'Conteneurisation', cost: 10000, description: 'Débloque Server Room Niv 6', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 6, target: 'server' }], req: 'T3' },
+  { id: 'T5', name: 'Efficience Énergétique', cost: 20000, description: 'Débloque Server Room Niv 7', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 7, target: 'server' }], req: 'T4' },
+  { id: 'T6', name: 'Cloud Hybride', cost: 40000, description: 'Débloque Server Room Niv 8', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 8, target: 'server' }], req: 'T5' },
+  { id: 'T7', name: 'Refroidissement Liquide', cost: 80000, description: 'Débloque Server Room Niv 9', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 9, target: 'server' }], req: 'T6' },
+  { id: 'T8', name: 'Stabilité Quantique', cost: 200000, description: 'Débloque Server Room Niv 10', category: 'INFRA', effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 10, target: 'server' }], req: 'T7' },
+
+  // ECOLOGY (CO2 Reduction)
+  { id: 'E1', name: 'Recyclage Papier', cost: 500, description: '-5% CO2 Global', category: 'ECOLOGY', effects: [{ type: 'CO2_REDUCTION', value: 0.05 }] },
+  { id: 'E2', name: 'Ampoules LED', cost: 2000, description: '-10% CO2 Global', category: 'ECOLOGY', effects: [{ type: 'CO2_REDUCTION', value: 0.10 }], req: 'E1' },
+  { id: 'E3', name: 'Politique Zéro Déchet', cost: 8000, description: '-15% CO2 Global', category: 'ECOLOGY', effects: [{ type: 'CO2_REDUCTION', value: 0.15 }], req: 'E2' },
+  { id: 'E4', name: 'Compensation Carbone', cost: 25000, description: '-20% CO2 Global', category: 'ECOLOGY', effects: [{ type: 'CO2_REDUCTION', value: 0.20 }], req: 'E3' },
+
+  // ECONOMY (Cost Reduction)
+  { id: 'M1', name: 'Achats Groupés', cost: 1500, description: '-5% Coûts Amélioration', category: 'ECONOMY', effects: [{ type: 'COST_REDUCTION', value: 0.05 }] },
+  { id: 'M2', name: 'Optimisation Fiscale', cost: 5000, description: '-10% Coûts Amélioration', category: 'ECONOMY', effects: [{ type: 'COST_REDUCTION', value: 0.10 }], req: 'M1' },
+  { id: 'M3', name: 'Partenariats Stratégiques', cost: 15000, description: '-15% Coûts Amélioration', category: 'ECONOMY', effects: [{ type: 'COST_REDUCTION', value: 0.15 }], req: 'M2' },
 ];
 
 // --- 5. CLASSROOM ---
@@ -130,7 +153,7 @@ export interface ClassroomLevel {
     level: number;
     name: string;
     cost: number;
-    capacity: number; // Slots for PCs
+    capacity: number; 
 }
 
 export const CLASSROOM_LEVELS: ClassroomLevel[] = [
@@ -200,6 +223,23 @@ export const GYM_ACTIVITIES = {
         product: { name: 'Vélo Elliptique', link: 'https://www.decathlon.fr/p/velo-cargo-electrique-longtail-chargement-arriere-r500e-vert-clair/_/R-p-349924?mc=8826512&c=vert', reward: 500 }
     }
 };
+
+// --- 8. RESEARCH LAB ---
+export interface ResearchLabLevel {
+    level: number;
+    name: string;
+    cost: number;
+    rpGeneration: number; // RP per tick
+    description: string;
+}
+
+export const RESEARCH_LAB_LEVELS: ResearchLabLevel[] = [
+    { level: 1, name: 'Coin Bureau', cost: 0, rpGeneration: 1, description: 'Un simple bureau avec un PC' },
+    { level: 2, name: 'Petit Labo', cost: 2000, rpGeneration: 5, description: 'Quelques éprouvettes et serveurs de calcul' },
+    { level: 3, name: 'Département R&D', cost: 10000, rpGeneration: 15, description: 'Une équipe dédiée à l\'innovation' },
+    { level: 4, name: 'Centre de Recherche', cost: 50000, rpGeneration: 40, description: 'Bâtiment entier dédié à la science' },
+    { level: 5, name: 'Campus Innovation', cost: 200000, rpGeneration: 100, description: 'Pôle mondial de recherche' },
+];
 
 // --- 7. FIXED MAP & ROOMS ---
 export const ROOMS = {

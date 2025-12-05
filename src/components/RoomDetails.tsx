@@ -9,7 +9,8 @@ import {
   CLASSROOM_PCS,
   GYM_LEVELS,
   GYM_QUESTIONS,
-  GYM_ACTIVITIES
+  GYM_ACTIVITIES,
+  RESEARCH_LAB_LEVELS
 } from '../config/gameConfig';
 
 export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () => void }) => {
@@ -19,6 +20,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
   const isServer = roomId.startsWith('server');
   const isClassroom = roomId.startsWith('classroom');
   const isGym = roomId.startsWith('gym');
+  const isResearch = roomId.startsWith('research');
 
   // Local state for Gym QCM
   const [qcmAnswers, setQcmAnswers] = useState<Record<string, string>>({});
@@ -53,10 +55,10 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
           {nextConfig ? (
             <button 
                 onClick={store.upgradeGenerator}
-                disabled={store.money < nextConfig.cost}
+                disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction)}
                 className="px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
             >
-                Upgrade System (${nextConfig.cost.toLocaleString()})
+                Upgrade System (${(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
             </button>
           ) : (
             <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
@@ -87,10 +89,10 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
           {nextConfig ? (
             <button 
                 onClick={store.upgradeClassroom}
-                disabled={store.money < nextConfig.cost}
+                disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction)}
                 className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
             >
-                Expand Room (${nextConfig.cost.toLocaleString()})
+                Expand Room (${(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
             </button>
           ) : (
             <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
@@ -118,10 +120,10 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
                                         <div className="text-[10px] text-gray-300 mb-1">Upgrade to {nextPc.name}</div>
                                         <button 
                                             onClick={() => store.upgradeClassroomPC(index)}
-                                            disabled={store.money < nextPc.cost}
+                                            disabled={store.money < nextPc.cost * (1 - store.globalModifiers.costReduction)}
                                             className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
                                         >
-                                            ${nextPc.cost}
+                                            ${(nextPc.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()}
                                         </button>
                                     </div>
                                 )}
@@ -133,7 +135,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
                             <div key={index} className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800" onClick={() => store.buyClassroomPC(index)}>
                                 <span className="text-xs text-gray-500">Empty</span>
                                 <div className="text-xs text-green-400 font-bold">+ Buy</div>
-                                <div className="text-[10px] text-gray-400">${basePc.cost}</div>
+                                <div className="text-[10px] text-gray-400">${(basePc.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()}</div>
                             </div>
                         );
                     }
@@ -240,14 +242,101 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
                     <div className="mt-4 flex justify-end">
                          <button 
                             onClick={store.upgradeGym}
-                            disabled={store.money < nextConfig.cost || (level === 1 && !profile)}
+                            disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction) || (level === 1 && !profile)}
                             className="px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
                         >
-                            Upgrade to {nextConfig.name} (${nextConfig.cost.toLocaleString()})
+                            Upgrade to {nextConfig.name} (${(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
                         </button>
                     </div>
                 )}
             </div>
+            <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
+        </div>
+      );
+  }
+
+  if (isResearch) {
+      const level = store.researchLabLevel;
+      const config = RESEARCH_LAB_LEVELS[level - 1];
+      const nextConfig = RESEARCH_LAB_LEVELS[level];
+
+      const categories = {
+          'INFRA': 'Infrastructure',
+          'ECOLOGY': 'Écologie',
+          'ECONOMY': 'Économie'
+      };
+
+      return (
+        <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-96 overflow-hidden">
+            {/* LEFT: Lab Stats */}
+            <div className="w-1/4 border-r border-gray-700 pr-6 overflow-y-auto">
+                <h2 className="text-2xl font-bold text-cyan-400 mb-2">{config.name} (Lvl {level})</h2>
+                <p className="text-gray-400 mb-4">{config.description}</p>
+                
+                <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+                    <div className="text-sm text-gray-500">Research Output</div>
+                    <div className="text-3xl font-bold text-purple-400">+{config.rpGeneration} RP/s</div>
+                </div>
+
+                {nextConfig ? (
+                    <button 
+                        onClick={store.upgradeResearchLab}
+                        disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction)}
+                        className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
+                    >
+                        Upgrade Lab (${(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
+                    </button>
+                ) : (
+                    <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
+                )}
+            </div>
+
+            {/* RIGHT: Tech Tree */}
+            <div className="flex-1 overflow-y-auto">
+                <h3 className="font-bold text-gray-300 mb-4 sticky top-0 bg-gray-800 pb-2">Skill Tree</h3>
+                
+                <div className="grid grid-cols-3 gap-6">
+                    {Object.entries(categories).map(([catKey, catName]) => (
+                        <div key={catKey} className="flex flex-col gap-3">
+                            <h4 className="font-bold text-gray-400 border-b border-gray-600 pb-1">{catName}</h4>
+                            {TECH_TREE.filter(t => t.category === catKey).map(tech => {
+                                const isUnlocked = store.unlockedTechs.includes(tech.id);
+                                const isReqMet = tech.req ? store.unlockedTechs.includes(tech.req) : true;
+                                const canUnlock = !isUnlocked && isReqMet && store.research >= tech.cost;
+
+                                return (
+                                    <div 
+                                        key={tech.id} 
+                                        className={`p-3 rounded border flex flex-col gap-1 relative
+                                            ${isUnlocked ? 'bg-green-900/20 border-green-600' : 
+                                              isReqMet ? 'bg-gray-700 border-gray-500' : 'bg-gray-800 border-gray-700 opacity-50'}
+                                        `}
+                                    >
+                                        <div className="font-bold text-sm text-white">{tech.name}</div>
+                                        <div className="text-xs text-gray-400">{tech.description}</div>
+                                        <div className="text-xs text-purple-300 font-bold mt-1">{tech.cost} RP</div>
+                                        
+                                        {isUnlocked ? (
+                                            <div className="absolute top-2 right-2 text-green-500">✔</div>
+                                        ) : (
+                                            <button 
+                                                onClick={() => store.unlockTech(tech.id)}
+                                                disabled={!canUnlock}
+                                                className={`mt-2 py-1 px-2 rounded text-xs font-bold
+                                                    ${canUnlock ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-gray-600 text-gray-400 cursor-not-allowed'}
+                                                `}
+                                            >
+                                                Unlock
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
         </div>
       );
@@ -260,7 +349,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
     
     const techReq = nextConfig?.techReq ? TECH_TREE.find(t => t.id === nextConfig.techReq) : null;
     const isTechUnlocked = techReq ? store.unlockedTechs.includes(techReq.id) : true;
-    const canUpgrade = nextConfig && store.money >= nextConfig.cost && isTechUnlocked && store.energyCapacity >= nextConfig.energyReq;
+    const canUpgrade = nextConfig && store.money >= nextConfig.cost * (1 - store.globalModifiers.costReduction) && isTechUnlocked && store.energyCapacity >= nextConfig.energyReq;
 
     return (
       <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-80 overflow-hidden">
@@ -276,8 +365,8 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
             <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
               <h3 className="font-bold text-gray-300 mb-2">Next Upgrade: {nextConfig.name}</h3>
               <ul className="text-sm space-y-1 mb-3">
-                <li className={store.money >= nextConfig.cost ? 'text-green-400' : 'text-red-400'}>
-                    • Cost: ${nextConfig.cost.toLocaleString()}
+                <li className={store.money >= nextConfig.cost * (1 - store.globalModifiers.costReduction) ? 'text-green-400' : 'text-red-400'}>
+                    • Cost: ${(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()}
                 </li>
                 <li className={store.energyCapacity >= nextConfig.energyReq ? 'text-green-400' : 'text-red-400'}>
                     • Energy Cap: {nextConfig.energyReq}⚡ (Have {store.energyCapacity})
@@ -299,32 +388,6 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
           ) : (
             <div className="text-blue-400 font-bold mb-4">MAX LEVEL REACHED</div>
           )}
-
-          {/* TECH TREE MINI-VIEW */}
-          <div className="mt-4">
-            <h3 className="font-bold text-gray-300 mb-2 border-b border-gray-600 pb-1">Research (Tech Tree)</h3>
-            <div className="space-y-2">
-                {TECH_TREE.map(tech => {
-                    const isUnlocked = store.unlockedTechs.includes(tech.id);
-                    return (
-                        <div key={tech.id} className={`p-2 rounded text-xs flex justify-between items-center ${isUnlocked ? 'bg-green-900/30 text-green-400' : 'bg-gray-900 text-gray-400'}`}>
-                            <span>{tech.name}</span>
-                            {isUnlocked ? (
-                                <span>✔</span>
-                            ) : (
-                                <button 
-                                    onClick={() => store.unlockTech(tech.id)}
-                                    disabled={store.money < tech.cost}
-                                    className="px-2 py-1 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 rounded text-white"
-                                >
-                                    ${tech.cost}
-                                </button>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-          </div>
         </div>
 
         {/* RIGHT: Slots & Servers */}
@@ -348,10 +411,10 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
                                     <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded">
                                         <button 
                                             onClick={() => store.upgradeServer(index)}
-                                            disabled={store.money < nextGrade.upgradeCost}
+                                            disabled={store.money < nextGrade.upgradeCost * (1 - store.globalModifiers.costReduction)}
                                             className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold"
                                         >
-                                            Upgrade ${nextGrade.upgradeCost}
+                                            Upgrade ${(nextGrade.upgradeCost * (1 - store.globalModifiers.costReduction)).toLocaleString()}
                                         </button>
                                     </div>
                                 )}
@@ -366,11 +429,11 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
                                         <button
                                             key={asset.id}
                                             onClick={() => store.buyServer(asset.id)}
-                                            disabled={store.money < asset.baseCost || store.serverRoomLevel < asset.minRoomLevel}
+                                            disabled={store.money < asset.baseCost * (1 - store.globalModifiers.costReduction) || store.serverRoomLevel < asset.minRoomLevel}
                                             className="px-2 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-[10px] rounded text-left truncate"
-                                            title={`${asset.name} ($${asset.baseCost})`}
+                                            title={`${asset.name} ($${(asset.baseCost * (1 - store.globalModifiers.costReduction)).toLocaleString()})`}
                                         >
-                                            {asset.name} (${asset.baseCost})
+                                            {asset.name} (${(asset.baseCost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
                                         </button>
                                     ))}
                                 </div>
