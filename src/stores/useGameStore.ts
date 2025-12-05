@@ -88,7 +88,7 @@ interface GameState {
   coolingSlots: (CoolingSlot | null)[]
 
   backupSlots: (BackupSlot | null)[]
-
+  
   // Classrooms (Multi-instance)
   classrooms: Record<string, ClassroomData>
 
@@ -179,6 +179,32 @@ const INITIAL_CLASSROOMS: Record<string, ClassroomData> = {
   },
 }
 
+const calculateTotalEnergy = (
+  classrooms: Record<string, ClassroomData>,
+  coolingSlots: (CoolingSlot | null)[],
+  backupSlots: (BackupSlot | null)[]
+): number => {
+  let totalEnergy = 0
+  Object.values(classrooms).forEach((c) => {
+    c.classroomSlots.forEach((s) => {
+      if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
+    })
+    c.networkSlots.forEach((s) => {
+      if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
+    })
+    c.teacherSlots.forEach((s) => {
+      if (s) totalEnergy += TEACHERS[s.level - 1].energy
+    })
+  })
+  coolingSlots.forEach((s) => {
+    if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
+  })
+  backupSlots.forEach((s) => {
+    if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
+  })
+  return totalEnergy
+}
+
 export const useGameStore = create<GameState>((set, get) => ({
   money: GAME_CONFIG.INITIAL_MONEY,
   research: GAME_CONFIG.INITIAL_RESEARCH,
@@ -205,7 +231,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   // classroomSlots removed
   // networkSlots removed
   // teacherSlots removed
-
+  
   classrooms: INITIAL_CLASSROOMS,
 
   coolingSlots: [], // Max 3 cooling systems
@@ -253,25 +279,19 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeGenerator: () => {
-    const { money, generatorLevel, unlockedTechs, globalModifiers, setErrorMessage } = get()
+    const { money, generatorLevel, globalModifiers } = get()
     if (generatorLevel >= 10) return
 
     const nextLevel = GENERATOR_LEVELS[generatorLevel]
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money < cost) return
-
-    // Check tech requirement
-    if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
-      setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
-      return
+    if (money >= cost) {
+      set({
+        money: money - cost,
+        generatorLevel: generatorLevel + 1,
+        energyCapacity: nextLevel.capacity,
+      })
     }
-
-    set({
-      money: money - cost,
-      generatorLevel: generatorLevel + 1,
-      energyCapacity: nextLevel.capacity,
-    })
   },
 
   upgradeServerRoom: () => {
@@ -300,61 +320,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         return
       }
 
-      // Check energy for all current equipment
-      const {
-        classroomSlots,
-        networkSlots,
-        teacherSlots,
-        coolingSlots: currentCooling,
-        backupSlots: currentBackup,
-      } = get()
-      let totalEnergy = 0
-
-      classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          totalEnergy += pc.energy
-        }
-      })
-
-      networkSlots.forEach((slot) => {
-        if (slot) {
-          const network = NETWORK_EQUIPMENT[slot.level - 1]
-          totalEnergy += network.energy
-        }
-      })
-
-      teacherSlots.forEach((slot) => {
-        if (slot) {
-          const teacher = TEACHERS[slot.level - 1]
-          totalEnergy += teacher.energy
-        }
-      })
-
-      currentCooling.forEach((slot) => {
-        if (slot) {
-          const cooling = COOLING_SYSTEMS[slot.level - 1]
-          totalEnergy += cooling.energy
-        }
-      })
-
-      currentBackup.forEach((slot) => {
-        if (slot) {
-          const backup = BACKUP_SYSTEMS[slot.level - 1]
-          totalEnergy += backup.energy
-        }
-      })
-
+      const totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
       const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-      const currentCapacity = generatorConfig.capacity
 
-      if (totalEnergy > currentCapacity) {
+      if (totalEnergy > generatorConfig.capacity) {
         setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
         return
       }
 
       const newCoolingSlots = [...coolingSlots, null]
-
       const { maxCo2 } = get()
       const co2Increase = Math.floor(cost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
@@ -375,55 +349,15 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       if (money < cost) return
 
-      // Check energy
-      const { classroomSlots, networkSlots, teacherSlots, coolingSlots: currentCooling } = get()
-      let totalEnergy = 0
-
-      classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          totalEnergy += pc.energy
-        }
-      })
-
-      networkSlots.forEach((slot) => {
-        if (slot) {
-          const network = NETWORK_EQUIPMENT[slot.level - 1]
-          totalEnergy += network.energy
-        }
-      })
-
-      teacherSlots.forEach((slot) => {
-        if (slot) {
-          const teacher = TEACHERS[slot.level - 1]
-          totalEnergy += teacher.energy
-        }
-      })
-
-      currentCooling.forEach((slot) => {
-        if (slot) {
-          const cooling = COOLING_SYSTEMS[slot.level - 1]
-          totalEnergy += cooling.energy
-        }
-      })
-
-      backupSlots.forEach((slot) => {
-        if (slot) {
-          const backup = BACKUP_SYSTEMS[slot.level - 1]
-          totalEnergy += backup.energy
-        }
-      })
-
+      const totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
       const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-      const currentCapacity = generatorConfig.capacity
 
-      if (totalEnergy > currentCapacity) {
+      if (totalEnergy > generatorConfig.capacity) {
         setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
         return
       }
 
       const newBackupSlots = [...backupSlots, null]
-
       const { maxCo2 } = get()
       const co2Increase = Math.floor(cost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
@@ -436,7 +370,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    // Normal upgrade path: upgrade room level and increase slots
+    // Normal upgrade path
     if (serverRoomLevel >= 10) {
       setErrorMessage('SALLE AU MAXIMUM')
       return
@@ -445,7 +379,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextLevelConfig = SERVER_ROOM_LEVELS[serverRoomLevel]
     const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
 
-    // Checks
     if (money < cost) return
     if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) return
     if (energyCapacity < nextLevelConfig.energyReq) {
@@ -453,56 +386,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    // Check energy for all current equipment
-    const {
-      serverSlots,
-      classroomSlots,
-      networkSlots,
-      teacherSlots,
-      coolingSlots: currentCooling,
-      backupSlots: currentBackup,
-    } = get()
-    let totalEnergy = 0
-
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    currentCooling.forEach((slot) => {
-      if (slot) {
-        const cooling = COOLING_SYSTEMS[slot.level - 1]
-        totalEnergy += cooling.energy
-      }
-    })
-
-    currentBackup.forEach((slot) => {
-      if (slot) {
-        const backup = BACKUP_SYSTEMS[slot.level - 1]
-        totalEnergy += backup.energy
-      }
-    })
-
+    const totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
     const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
 
-    if (totalEnergy > currentCapacity) {
+    if (totalEnergy > generatorConfig.capacity) {
       setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
       return
     }
@@ -552,9 +439,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeClassroom: (classroomId) => {
-    const { money, classrooms, globalModifiers, generatorLevel, setErrorMessage, unlockedTechs } =
-      get()
-
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      unlockedTechs,
+    } = get()
+    
     const classroom = classrooms[classroomId]
     if (!classroom) return
 
@@ -578,34 +471,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       // Check energy for the new network slot
       const baseNetwork = NETWORK_EQUIPMENT[0]
-      let totalEnergy = 0
-
-      // Calculate current energy from all classrooms
-      Object.values(classrooms).forEach((c) => {
-        c.classroomSlots.forEach((s) => {
-          if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-        })
-        c.networkSlots.forEach((s) => {
-          if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-        })
-        c.teacherSlots.forEach((s) => {
-          if (s) totalEnergy += TEACHERS[s.level - 1].energy
-        })
-      })
-
-      // Add energy from other fixed sources (Cooling/Backup if any - simpler: just reuse logic or re-calc)
-      // Actually simpler: just calculate delta.
-      // But we need total usage.
-      // Let's copy the iteration logic for now or rely on a helper? UseGameStore doesn't handle helpers well inside actions easily.
-      // Let's iterate all cleanly.
-
       const { coolingSlots, backupSlots } = get()
-      coolingSlots.forEach((s) => {
-        if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-      })
-      backupSlots.forEach((s) => {
-        if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-      })
+      let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
       // Add energy from potential new network equipment
       totalEnergy += baseNetwork.energy
@@ -641,28 +508,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (money < cost) return
 
       const newTeacherSlots = [...teacherSlots, null]
-
+      
       const baseTeacher = TEACHERS[0]
-      let totalEnergy = 0
-
-      Object.values(classrooms).forEach((c) => {
-        c.classroomSlots.forEach((s) => {
-          if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-        })
-        c.networkSlots.forEach((s) => {
-          if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-        })
-        c.teacherSlots.forEach((s) => {
-          if (s) totalEnergy += TEACHERS[s.level - 1].energy
-        })
-      })
       const { coolingSlots, backupSlots } = get()
-      coolingSlots.forEach((s) => {
-        if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-      })
-      backupSlots.forEach((s) => {
-        if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-      })
+      let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
       totalEnergy += baseTeacher.energy
 
@@ -724,7 +573,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { money, labSectionLevels, globalModifiers, maxCo2 } = get()
     const currentLevel = labSectionLevels[sectionId] || 0
     const section = LAB_SECTIONS[sectionId]
-
+    
     if (!section) return
 
     // Calculate cost: baseCost * (multiplier ^ currentLevel)
@@ -857,8 +706,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       globalModifiers,
       generatorLevel,
       setErrorMessage,
-      coolingSlots,
-      backupSlots,
     } = get()
 
     const classroom = classrooms[classroomId]
@@ -871,24 +718,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (money < cost) return
 
     // Calculate energy
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    const { coolingSlots, backupSlots } = get()
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
     totalEnergy += pcConfig.energy
 
@@ -908,6 +739,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     })
   },
 
+
   upgradeClassroomPC: (classroomId, slotIndex) => {
     const {
       money,
@@ -916,8 +748,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       generatorLevel,
       setErrorMessage,
       unlockedTechs,
-      coolingSlots,
-      backupSlots,
     } = get()
 
     const classroom = classrooms[classroomId]
@@ -936,35 +766,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    let totalEnergy = 0
-    // Sum all normally, but correct for the one being upgraded
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s, idx) => {
-        if (s) {
-          if (c === classroom && idx === slotIndex) {
-            // Adding next level energy instead of current (handled implicitly by summing current + delta, or recalculating)
-            // Here we sum all current, then subtract current + add next
-            totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-          } else {
-            totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-          }
-        }
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    const { coolingSlots, backupSlots } = get()
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
-    // Adjust for upgrade
     const currentPcEnergy = CLASSROOM_PCS[slot.level - 1].energy
     totalEnergy = totalEnergy - currentPcEnergy + nextLevelConfig.energy
 
@@ -991,7 +795,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       setErrorMessage,
       unlockedTechs,
       coolingSlots,
-      backupSlots,
+      backupSlots
     } = get()
 
     const classroom = classrooms[classroomId]
@@ -1008,24 +812,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
     totalEnergy += networkConfig.energy
 
@@ -1052,9 +839,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       setErrorMessage,
       unlockedTechs,
       coolingSlots,
-      backupSlots,
+      backupSlots
     } = get()
-
+    
     const classroom = classrooms[classroomId]
     if (!classroom) return
     const slot = classroom.networkSlots[slotIndex]
@@ -1071,27 +858,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    let totalEnergy = 0
-    // Sum energy
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s, idx) => {
-        if (s) {
-          totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-        }
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
     const currentEnergy = NETWORK_EQUIPMENT[slot.level - 1].energy
     totalEnergy = totalEnergy - currentEnergy + nextLevelConfig.energy
@@ -1119,7 +886,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       setErrorMessage,
       unlockedTechs,
       coolingSlots,
-      backupSlots,
+      backupSlots
     } = get()
 
     const classroom = classrooms[classroomId]
@@ -1136,24 +903,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
     totalEnergy += teacherConfig.energy
 
@@ -1180,9 +930,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       setErrorMessage,
       unlockedTechs,
       coolingSlots,
-      backupSlots,
+      backupSlots
     } = get()
-
+    
     const classroom = classrooms[classroomId]
     if (!classroom) return
     const slot = classroom.teacherSlots[slotIndex]
@@ -1199,54 +949,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       return
     }
 
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s, idx) => {
-        if (s) {
-          if (c === classroom && idx === slotIndex) {
-            // target
-          } else {
-            totalEnergy += TEACHERS[s.level - 1].energy
-          }
-        }
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
     const currentEnergy = TEACHERS[slot.level - 1].energy
-    totalEnergy = totalEnergy + nextLevelConfig.energy // (current excluded in loop logic above? No wait, logic above is messy, let's stick to standard pattern: sum all - current + next)
-
-    // reset totalEnergy for clean calculation
-    totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
-
     totalEnergy = totalEnergy - currentEnergy + nextLevelConfig.energy
 
     const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
@@ -1264,15 +969,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   buyCooling: (slotIndex) => {
-    const {
-      money,
-      coolingSlots,
-      backupSlots,
-      classrooms,
-      generatorLevel,
-      setErrorMessage,
-      globalModifiers,
-    } = get()
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
     if (coolingSlots[slotIndex]) return // Already exists
 
     const initialLevel = 1
@@ -1282,30 +979,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (money < cost) return
 
     // Energy Check
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
-
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
+    
     totalEnergy += config.energy
 
     if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
-      setErrorMessage("Pas assez d'électricité !")
-      return
+       setErrorMessage("Pas assez d'électricité !")
+       return
     }
 
     const newSlots = [...coolingSlots]
@@ -1313,20 +993,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       money: money - cost,
-      coolingSlots: newSlots,
+      coolingSlots: newSlots
     })
   },
 
   upgradeCooling: (slotIndex) => {
-    const {
-      money,
-      coolingSlots,
-      backupSlots,
-      classrooms,
-      generatorLevel,
-      setErrorMessage,
-      globalModifiers,
-    } = get()
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
     const slot = coolingSlots[slotIndex]
     if (!slot) return
     if (slot.level >= 10) return
@@ -1337,36 +1009,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (money < cost) return
 
     // Energy Check
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s, idx) => {
-      if (s) {
-        if (idx === slotIndex) {
-          // skip current, we add next later
-        } else {
-          totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-        }
-      }
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
-    totalEnergy += nextConfig.energy
+    const currentEnergy = COOLING_SYSTEMS[slot.level - 1].energy
+    
+    totalEnergy = totalEnergy - currentEnergy + nextConfig.energy
 
     if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
-      setErrorMessage("Pas assez d'électricité !")
-      return
+       setErrorMessage("Pas assez d'électricité !")
+       return
     }
 
     const newSlots = [...coolingSlots]
@@ -1374,20 +1025,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       money: money - cost,
-      coolingSlots: newSlots,
+      coolingSlots: newSlots
     })
   },
 
   buyBackup: (slotIndex) => {
-    const {
-      money,
-      coolingSlots,
-      backupSlots,
-      classrooms,
-      generatorLevel,
-      setErrorMessage,
-      globalModifiers,
-    } = get()
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
     if (backupSlots[slotIndex]) return
 
     const initialLevel = 1
@@ -1396,31 +1039,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (money < cost) return
 
-    // Energy Check
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s) => {
-      if (s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-    })
-
+     // Energy Check
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
+    
     totalEnergy += config.energy
 
     if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
-      setErrorMessage("Pas assez d'électricité !")
-      return
+       setErrorMessage("Pas assez d'électricité !")
+       return
     }
 
     const newSlots = [...backupSlots]
@@ -1428,20 +1054,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       money: money - cost,
-      backupSlots: newSlots,
+      backupSlots: newSlots
     })
   },
 
   upgradeBackup: (slotIndex) => {
-    const {
-      money,
-      coolingSlots,
-      backupSlots,
-      classrooms,
-      generatorLevel,
-      setErrorMessage,
-      globalModifiers,
-    } = get()
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
     const slot = backupSlots[slotIndex]
     if (!slot) return
     if (slot.level >= 10) return
@@ -1452,36 +1070,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (money < cost) return
 
     // Energy Check
-    let totalEnergy = 0
-    Object.values(classrooms).forEach((c) => {
-      c.classroomSlots.forEach((s) => {
-        if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
-      })
-      c.networkSlots.forEach((s) => {
-        if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
-      })
-      c.teacherSlots.forEach((s) => {
-        if (s) totalEnergy += TEACHERS[s.level - 1].energy
-      })
-    })
-    coolingSlots.forEach((s) => {
-      if (s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy
-    })
-    backupSlots.forEach((s, idx) => {
-      if (s) {
-        if (idx === slotIndex) {
-          // skip
-        } else {
-          totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy
-        }
-      }
-    })
+    let totalEnergy = calculateTotalEnergy(classrooms, coolingSlots, backupSlots)
 
-    totalEnergy += nextConfig.energy
+    const currentEnergy = BACKUP_SYSTEMS[slot.level - 1].energy
+    
+    totalEnergy = totalEnergy - currentEnergy + nextConfig.energy
 
     if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
-      setErrorMessage("Pas assez d'électricité !")
-      return
+       setErrorMessage("Pas assez d'électricité !")
+       return
     }
 
     const newSlots = [...backupSlots]
@@ -1489,144 +1086,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       money: money - cost,
-      backupSlots: newSlots,
+      backupSlots: newSlots
     })
   },
 
-  upgradeGym: () => {
-    const { money, gymLevel, globalModifiers, unlockedTechs, setErrorMessage } = get()
-    if (gymLevel >= 10) {
-      setErrorMessage('Salle de sport au maximum.')
-      return
-    }
 
-    const nextLevel = GYM_LEVELS[gymLevel]
-    const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money < cost) return
 
-    if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
-      setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
-      return
-    }
-
-    set({
-      money: money - cost,
-      gymLevel: gymLevel + 1,
-    })
-  },
-
-  upgradeResearchLab: () => {
-    const { money, researchLabLevel, globalModifiers } = get()
-    if (researchLabLevel >= 10) return
-
-    const nextLevel = RESEARCH_LAB_LEVELS[researchLabLevel]
-    const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    set({
-      money: money - cost,
-      researchLabLevel: researchLabLevel + 1,
-    })
-  },
-
-  setGymProfile: (profile) => set({ gymProfile: profile }),
-
-  performGymActivity: () => {
-    const { gymProfile, gymLevel } = get()
-    if (!gymProfile) return
-
-    const activity = GYM_ACTIVITIES[gymProfile.goal as keyof typeof GYM_ACTIVITIES]
-    if (!activity) return
-
-    // Simple reward logic for now
-    const reward = 100 * gymLevel
-    set((state) => ({ money: state.money + reward }))
-  },
-
-  unlockTech: (techId) => {
-    const { research, unlockedTechs } = get()
-    if (unlockedTechs.includes(techId)) return
-
-    const tech = TECH_TREE.find((t) => t.id === techId)
-    if (!tech) return
-
-    if (research >= tech.cost) {
-      // Check requirements
-      const reqsMet = tech.reqs.every((req) => unlockedTechs.includes(req))
-      if (!reqsMet) return
-
-      // Apply modifiers if any
-      const newModifiers = { ...get().globalModifiers }
-      tech.effects.forEach((effect) => {
-        if (effect.type === 'CO2_REDUCTION') {
-          newModifiers.co2Reduction += Number(effect.value)
-        } else if (effect.type === 'COST_REDUCTION') {
-          newModifiers.costReduction += Number(effect.value)
-        }
-      })
-
-      set({
-        research: research - tech.cost,
-        unlockedTechs: [...unlockedTechs, techId],
-        globalModifiers: newModifiers,
-      })
-    }
-  },
-
-  buyServer: (typeId) => {
-    const { money, serverSlots, globalModifiers, setErrorMessage, unlockedTechs } = get()
-    const asset = SERVER_ASSETS[typeId]
-    if (!asset) return
-
-    const emptySlotIndex = serverSlots.findIndex((s) => s === null)
-    if (emptySlotIndex === -1) {
-      setErrorMessage('Plus de place dans la salle serveur !')
-      return
-    }
-
-    const cost = asset.baseCost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    if (asset.techReq && !unlockedTechs.includes(asset.techReq)) {
-      setErrorMessage(`Recherche requise : ${asset.techReq}`)
-      return
-    }
-
-    const newSlots = [...serverSlots]
-    newSlots[emptySlotIndex] = { typeId, grade: 1 }
-
-    set({
-      money: money - cost,
-      serverSlots: newSlots,
-    })
-  },
-
-  upgradeServer: (slotIndex) => {
-    const { money, serverSlots, globalModifiers } = get()
-    const slot = serverSlots[slotIndex]
-    if (!slot) return
-
-    const asset = SERVER_ASSETS[slot.typeId]
-    const currentGrade = asset.grades.find((g) => g.grade === slot.grade)
-    const nextGrade = asset.grades.find((g) => g.grade === slot.grade + 1)
-
-    if (!nextGrade || !currentGrade) return
-
-    const cost = nextGrade.upgradeCost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    const newSlots = [...serverSlots]
-    newSlots[slotIndex] = { ...slot, grade: slot.grade + 1 }
-
-    set({
-      money: money - cost,
-      serverSlots: newSlots,
-    })
-  },
 
   tickUpdate: () => {
     set((state) => {
@@ -1648,84 +1114,71 @@ export const useGameStore = create<GameState>((set, get) => ({
       const taxAmount = grossServerIncome * roomConfig.taxRate
       const netServerIncome = grossServerIncome - taxAmount
 
-      // Classroom PC Income & Energy & CO2
+      // Classroom PC Income & CO2
       let classroomIncome = 0
-      let classroomEnergy = 0
       let classroomCo2 = 0
       let visualStudents = 0
 
-      // Network Equipment Income & Energy
+      // Network Equipment Income
       let networkIncome = 0
-      let networkEnergy = 0
 
-      // Teachers Income & Energy
+      // Teachers Income
       let teacherIncome = 0
-      let teacherEnergy = 0
 
-      Object.values(state.classrooms).forEach((classroom) => {
-        // PCs
-        classroom.classroomSlots.forEach((slot) => {
-          if (slot) {
-            const pc = CLASSROOM_PCS[slot.level - 1]
-            classroomIncome += pc.income
-            classroomEnergy += pc.energy
-            classroomCo2 += pc.co2
-            visualStudents++
-          }
-        })
+      Object.values(state.classrooms).forEach(classroom => {
+          // PCs
+          classroom.classroomSlots.forEach(slot => {
+            if (slot) {
+              const pc = CLASSROOM_PCS[slot.level - 1]
+              classroomIncome += pc.income
+              classroomCo2 += pc.co2
+              visualStudents++
+            }
+          })
 
-        // Network
-        classroom.networkSlots.forEach((slot) => {
-          if (slot) {
-            const network = NETWORK_EQUIPMENT[slot.level - 1]
-            networkIncome += network.income
-            networkEnergy += network.energy
-          }
-        })
-
-        // Teachers
-        classroom.teacherSlots.forEach((slot) => {
-          if (slot) {
-            const teacher = TEACHERS[slot.level - 1]
-            teacherIncome += teacher.income
-            teacherEnergy += teacher.energy
-          }
-        })
+          // Network
+          classroom.networkSlots.forEach(slot => {
+            if (slot) {
+              const network = NETWORK_EQUIPMENT[slot.level - 1]
+              networkIncome += network.income
+            }
+          })
+          
+          // Teachers
+          classroom.teacherSlots.forEach(slot => {
+            if (slot) {
+              const teacher = TEACHERS[slot.level - 1]
+              teacherIncome += teacher.income
+            }
+          })
       })
 
-      // Cooling Systems Income & Energy & CO2
+      // Cooling Systems Income & CO2
       let coolingIncome = 0
-      let coolingEnergy = 0
       let coolingCo2 = 0
 
       state.coolingSlots.forEach((slot) => {
         if (slot) {
           const cooling = COOLING_SYSTEMS[slot.level - 1]
           coolingIncome += cooling.income
-          coolingEnergy += cooling.energy
           coolingCo2 += cooling.co2
         }
       })
 
-      // Backup Systems Income & Energy & CO2
+      // Backup Systems Income & CO2
       let backupIncome = 0
-      let backupEnergy = 0
       let backupCo2 = 0
 
       state.backupSlots.forEach((slot) => {
         if (slot) {
           const backup = BACKUP_SYSTEMS[slot.level - 1]
           backupIncome += backup.income
-          backupEnergy += backup.energy
           backupCo2 += backup.co2
         }
       })
 
-      // 5. Total CO2 (Servers + Classrooms + Cooling + Backup + Generator)
-      const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
-
       // Add classroom CO2 to total
-      totalCo2 += classroomCo2 + coolingCo2 + backupCo2 + generatorConfig.co2
+      totalCo2 += classroomCo2 + coolingCo2 + backupCo2
 
       // Apply CO2 Reduction from Techs (after adding all sources)
       const currentCo2 = totalCo2 * (1 - state.globalModifiers.co2Reduction)
@@ -1745,9 +1198,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       // Total Energy Usage (PCs + Network + Teachers + Cooling + Backup, not server room base energy)
-      const currentEnergyUsage =
-        classroomEnergy + networkEnergy + teacherEnergy + coolingEnergy + backupEnergy
+      const currentEnergyUsage = calculateTotalEnergy(state.classrooms, state.coolingSlots, state.backupSlots)
 
+      const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
       const currentCapacity = generatorConfig.capacity
 
       const isPowered = currentCapacity >= currentEnergyUsage
@@ -1765,7 +1218,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         tick: state.tick + 1,
         money: state.money + finalIncome,
         research: state.research + (isPowered ? researchIncome : 0),
-        co2: Math.min(state.maxCo2, state.co2 + currentCo2), // Accumulate CO2
+        co2: currentCo2, // Current CO2 level (not accumulated, like energy)
         energyCapacity: currentCapacity,
         energyUsage: currentEnergyUsage,
         studentCount: visualStudents,

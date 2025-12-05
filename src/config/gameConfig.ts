@@ -1,5 +1,5 @@
 export const GAME_CONFIG = {
-  INITIAL_MONEY: 2000,
+  INITIAL_MONEY: 3000,
   INITIAL_ENERGY: 0,
   INITIAL_RESEARCH: 0,
   INITIAL_CO2: 0,
@@ -31,7 +31,7 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
   {
     level: 2,
     name: 'Groupe Électrogène Diesel',
-    cost: 800,
+    cost: 500,
     capacity: 60,
     co2: 25,
     techReq: null,
@@ -40,7 +40,7 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
   {
     level: 3,
     name: 'Panneaux Solaires Toit',
-    cost: 2000,
+    cost: 1500,
     capacity: 100,
     co2: 0,
     techReq: 'G_SOLAR',
@@ -238,7 +238,7 @@ export const SERVER_ASSETS: Record<string, ServerAssetType> = {
     name: 'Tour Obsolète',
     minRoomLevel: 1,
     levels: [
-      { level: 1, name: 'Standard', cost: 200, income: 15, co2: 10 },
+      { level: 1, name: 'Standard', cost: 200, income: 20, co2: 10 },
       { level: 2, name: 'Optimisé', cost: 300, income: 22, co2: 8 },
       { level: 3, name: 'Overclocké', cost: 450, income: 30, co2: 6 },
       { level: 4, name: 'Boosté', cost: 675, income: 45, co2: 5 },
@@ -256,7 +256,7 @@ export const SERVER_ASSETS: Record<string, ServerAssetType> = {
     minRoomLevel: 4,
     techReq: 'T_RACK',
     levels: [
-      { level: 1, name: 'Standard', cost: 1200, income: 80, co2: 5 },
+      { level: 1, name: 'Standard', cost: 1200, income: 100, co2: 5 },
       { level: 2, name: 'Optimisé', cost: 1800, income: 120, co2: 4 },
       { level: 3, name: 'Green', cost: 2700, income: 180, co2: 3 },
       { level: 4, name: 'Efficient', cost: 4050, income: 270, co2: 2 },
@@ -327,7 +327,7 @@ export const TECH_TREE: TechNode[] = [
   {
     id: 'T2',
     name: 'Active Directory',
-    cost: 1000,
+    cost: 300,
     description: 'Débloque Server Room Niv 3',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 3, target: 'server' }],
@@ -419,7 +419,7 @@ export const TECH_TREE: TechNode[] = [
   {
     id: 'C1',
     name: 'Pédagogie 1.0',
-    cost: 200,
+    cost: 50,
     description: 'Débloque le recrutement de Surveillants',
     category: 'CLASSROOM',
     effects: [{ type: 'UNLOCK_FEATURE', value: 'teacher_1', target: 'classroom' }],
@@ -429,7 +429,7 @@ export const TECH_TREE: TechNode[] = [
   {
     id: 'C2',
     name: 'Postes Informatiques',
-    cost: 500,
+    cost: 150,
     description: 'Débloque les PCs Basiques',
     category: 'CLASSROOM',
     effects: [{ type: 'UNLOCK_FEATURE', value: 'pc_1', target: 'classroom' }],
@@ -491,7 +491,7 @@ export const TECH_TREE: TechNode[] = [
   {
     id: 'G_SOLAR',
     name: 'Énergie Solaire',
-    cost: 5000,
+    cost: 1000,
     description: 'Débloque les Panneaux Solaires (Toit) - 0 CO2',
     category: 'ECOLOGY',
     effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_3', target: 'generator' }],
@@ -767,13 +767,13 @@ export interface ClassroomPC {
 }
 
 export const CLASSROOM_PCS: ClassroomPC[] = [
-  { level: 1, name: 'PC Patate', cost: 100, energy: 1, income: 5, co2: 1, icon: '🥔' },
+  { level: 1, name: 'PC Patate', cost: 100, energy: 1, income: 8, co2: 1, icon: '🥔' },
   {
     level: 2,
     name: 'PC Bureautique',
     cost: 180,
     energy: 2,
-    income: 10,
+    income: 15,
     co2: 2,
     icon: '🖥️',
     techReq: 'C2',
@@ -1191,21 +1191,21 @@ export const RESEARCH_LAB_LEVELS: ResearchLabLevel[] = [
     level: 1,
     name: 'Coin Bureau',
     cost: 0,
-    rpGeneration: 1,
+    rpGeneration: 5,
     description: 'Un simple bureau avec un PC',
   },
   {
     level: 2,
     name: 'Petit Labo',
     cost: 2000,
-    rpGeneration: 5,
+    rpGeneration: 10,
     description: 'Quelques éprouvettes et serveurs de calcul',
   },
   {
     level: 3,
     name: 'Département R&D',
     cost: 10000,
-    rpGeneration: 15,
+    rpGeneration: 25,
     description: "Une équipe dédiée à l'innovation",
   },
   {
@@ -1352,8 +1352,8 @@ export const DEFAULT_MAP = [
     y1: 9,
     x2: 54,
     y2: 22,
-    unlocked: false,
-    cost: 10000,
+    unlocked: true,
+    cost: 0,
   },
 
   // Middle Left
