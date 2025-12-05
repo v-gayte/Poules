@@ -9,6 +9,8 @@ import {
   CLASSROOM_PCS,
   NETWORK_EQUIPMENT,
   TEACHERS,
+  COOLING_SYSTEMS,
+  BACKUP_SYSTEMS,
   GYM_LEVELS,
   GYM_QUESTIONS,
   GYM_ACTIVITIES,
@@ -609,64 +611,89 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
       store.energyCapacity >= nextConfig.energyReq
 
     return (
-      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-80 overflow-hidden">
+      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-96 overflow-hidden">
         {/* LEFT: Room Stats */}
         <div className="w-1/3 border-r border-gray-700 pr-6 overflow-y-auto">
-          <h2 className="text-2xl font-bold text-blue-400 mb-1">
+          <h2 className="text-2xl font-bold text-blue-400 mb-2">
             {config.name} (Lvl {level})
           </h2>
-          <div className="text-sm text-gray-400 mb-4">
-            GAFAM Tax: <span className="text-red-400">{(config.taxRate * 100).toFixed(0)}%</span> |
-            Energy: <span className="text-yellow-400">{config.energyReq}⚡</span>
+          <p className="text-gray-400 mb-4">Manage your server infrastructure.</p>
+
+          <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+            <div className="text-sm text-gray-500">Server Capacity</div>
+            <div className="text-3xl font-bold text-white">30 Slots</div>
           </div>
 
-          {nextConfig ? (
+          {store.coolingSlots.length > 0 && (
             <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
-              <h3 className="font-bold text-gray-300 mb-2">Next Upgrade: {nextConfig.name}</h3>
-              <ul className="text-sm space-y-1 mb-3">
-                <li
-                  className={
-                    store.money >= nextConfig.cost * (1 - store.globalModifiers.costReduction)
-                      ? 'text-green-400'
-                      : 'text-red-400'
-                  }
-                >
-                  • Cost: $
-                  {(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()}
-                </li>
-                <li
-                  className={
-                    store.energyCapacity >= nextConfig.energyReq ? 'text-green-400' : 'text-red-400'
-                  }
-                >
-                  • Energy Cap: {nextConfig.energyReq}⚡ (Have {store.energyCapacity})
-                </li>
-                {techReq && (
-                  <li className={isTechUnlocked ? 'text-green-400' : 'text-red-400'}>
-                    • Tech: {techReq.name}
-                  </li>
-                )}
-              </ul>
+              <div className="text-sm text-gray-500">Cooling Slots</div>
+              <div className="text-3xl font-bold text-white">{store.coolingSlots.length} / 1</div>
+            </div>
+          )}
+
+          {store.backupSlots.length > 0 && (
+            <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+              <div className="text-sm text-gray-500">Backup Slots</div>
+              <div className="text-3xl font-bold text-white">{store.backupSlots.length} / 3</div>
+            </div>
+          )}
+
+          <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+            <div className="text-sm text-gray-500">GAFAM Tax</div>
+            <div className="text-2xl font-bold text-red-400">
+              {(config.taxRate * 100).toFixed(0)}%
+            </div>
+          </div>
+
+          {store.coolingSlots.length === 0 ? (
+            nextConfig ? (
               <button
                 onClick={store.upgradeServerRoom}
-                disabled={!canUpgrade}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded font-bold"
+                disabled={
+                  store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction) ||
+                  (nextConfig.techReq && !isTechUnlocked) ||
+                  store.energyCapacity < nextConfig.energyReq
+                }
+                className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
               >
-                Upgrade Room
+                Add Cooling Slot ($
+                {(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
               </button>
-            </div>
+            ) : (
+              <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
+            )
+          ) : store.backupSlots.length < 3 ? (
+            <button
+              onClick={store.upgradeServerRoom}
+              disabled={
+                store.money <
+                (nextConfig
+                  ? nextConfig.cost * (1 - store.globalModifiers.costReduction)
+                  : config.cost * (1 - store.globalModifiers.costReduction))
+              }
+              className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
+            >
+              Add Backup Slot ($
+              {(
+                (nextConfig ? nextConfig.cost : config.cost) *
+                (1 - store.globalModifiers.costReduction)
+              ).toLocaleString()}
+              )
+            </button>
           ) : (
-            <div className="text-blue-400 font-bold mb-4">MAX LEVEL REACHED</div>
+            <div className="text-green-400 font-bold">SALLE AU MAXIMUM</div>
           )}
         </div>
 
-        {/* RIGHT: Slots & Servers */}
+        {/* RIGHT: Server Slots */}
         <div className="flex-1 overflow-y-auto">
-          <h3 className="font-bold text-gray-300 mb-4 sticky top-0 bg-gray-800 pb-2">
-            Server Slots ({store.serverSlots.filter((s) => s).length}/{config.slots})
-          </h3>
-          <div className="grid grid-cols-4 gap-3">
-            {store.serverSlots.map((slot, index) => {
+          <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4">
+            <h3 className="font-bold text-gray-300">
+              Server Slots ({store.serverSlots.filter((s) => s).length}/{config.slots})
+            </h3>
+          </div>
+          <div className="grid grid-cols-5 gap-3">
+            {store.serverSlots.slice(0, config.slots).map((slot, index) => {
               if (slot) {
                 const asset = SERVER_ASSETS[slot.typeId]
                 const grade = asset.grades.find((g) => g.grade === slot.grade)!
@@ -675,26 +702,36 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                 return (
                   <div
                     key={index}
-                    className="bg-gray-700 p-3 rounded border border-gray-600 relative group"
+                    className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center z-0"
                   >
-                    <div className="font-bold text-sm text-white">{asset.name}</div>
-                    <div className="text-xs text-blue-300">
+                    <div className="font-bold text-xs text-white truncate">{asset.name}</div>
+                    <div className="text-[10px] text-blue-300">
                       {grade.name} (G{slot.grade})
                     </div>
-                    <div className="text-xs text-green-400 mt-1">+${grade.income}/t</div>
-                    <div className="text-xs text-gray-400">{grade.co2} CO2</div>
+                    <div className="text-[10px] text-green-400">+${grade.income}/t</div>
+                    <div className="text-[10px] text-red-400">+{grade.co2} CO₂</div>
 
                     {nextGrade && (
-                      <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                      <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
+                        <div className="text-[10px] text-gray-300 mb-1">
+                          Upgrade to {nextGrade.name}
+                        </div>
+                        <div className="text-[10px] text-green-400 mb-1">
+                          +${nextGrade.income - grade.income}/t
+                        </div>
+                        <div className="text-[10px] text-red-400 mb-1">
+                          {nextGrade.co2 - grade.co2 > 0 ? '+' : ''}
+                          {nextGrade.co2 - grade.co2} CO₂
+                        </div>
                         <button
                           onClick={() => store.upgradeServer(index)}
                           disabled={
                             store.money <
                             nextGrade.upgradeCost * (1 - store.globalModifiers.costReduction)
                           }
-                          className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold"
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
                         >
-                          Upgrade $
+                          $
                           {(
                             nextGrade.upgradeCost *
                             (1 - store.globalModifiers.costReduction)
@@ -708,36 +745,206 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                 return (
                   <div
                     key={index}
-                    className="bg-gray-900/50 p-3 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-2 min-h-[100px]"
+                    className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800"
                   >
-                    <span className="text-xs text-gray-500">Empty Slot</span>
-                    <div className="flex flex-col gap-1 w-full">
-                      {Object.values(SERVER_ASSETS).map((asset) => (
-                        <button
-                          key={asset.id}
-                          onClick={() => store.buyServer(asset.id)}
-                          disabled={
-                            store.money <
-                              asset.baseCost * (1 - store.globalModifiers.costReduction) ||
-                            store.serverRoomLevel < asset.minRoomLevel
-                          }
-                          className="px-2 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-[10px] rounded text-left truncate"
-                          title={`${asset.name} ($${(asset.baseCost * (1 - store.globalModifiers.costReduction)).toLocaleString()})`}
-                        >
-                          {asset.name} ($
-                          {(
-                            asset.baseCost *
-                            (1 - store.globalModifiers.costReduction)
-                          ).toLocaleString()}
-                          )
-                        </button>
-                      ))}
+                    <span className="text-xs text-gray-500">Empty</span>
+                    <div className="text-xs text-green-400 font-bold">+ Buy</div>
+                    <div className="flex flex-col gap-1 w-full mt-1">
+                      {Object.values(SERVER_ASSETS)
+                        .filter((asset) => store.serverRoomLevel >= asset.minRoomLevel)
+                        .map((asset) => (
+                          <button
+                            key={asset.id}
+                            onClick={() => store.buyServer(asset.id)}
+                            disabled={
+                              store.money <
+                              asset.baseCost * (1 - store.globalModifiers.costReduction)
+                            }
+                            className="px-2 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-[10px] rounded text-left truncate"
+                            title={`${asset.name} ($${(asset.baseCost * (1 - store.globalModifiers.costReduction)).toLocaleString()})`}
+                          >
+                            {asset.name} ($
+                            {(
+                              asset.baseCost *
+                              (1 - store.globalModifiers.costReduction)
+                            ).toLocaleString()}
+                            )
+                          </button>
+                        ))}
                     </div>
                   </div>
                 )
               }
             })}
           </div>
+
+          {/* Cooling Systems Section */}
+          {store.coolingSlots.length > 0 && (
+            <>
+              <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4 mt-6">
+                <h3 className="font-bold text-gray-300">
+                  Cooling Systems ({store.coolingSlots.filter((s) => s).length}/1)
+                </h3>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {Array.from({ length: 1 }, (_, index) => {
+                  const slot = store.coolingSlots[index] || null
+                  if (slot) {
+                    const cooling = COOLING_SYSTEMS[slot.level - 1]
+                    const nextCooling = COOLING_SYSTEMS[slot.level]
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center z-0"
+                      >
+                        <div className="text-2xl mb-1">{cooling.icon}</div>
+                        <div className="font-bold text-xs text-white truncate">{cooling.name}</div>
+                        <div className="text-[10px] text-green-400">+${cooling.income}/s</div>
+                        <div className="text-[10px] text-yellow-400">+{cooling.energy}⚡</div>
+                        <div className="text-[10px] text-red-400">+{cooling.co2} CO₂</div>
+
+                        {nextCooling && (
+                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
+                            <div className="text-[10px] text-gray-300 mb-1">
+                              Upgrade to {nextCooling.name}
+                            </div>
+                            <div className="text-[10px] text-green-400 mb-1">
+                              +${nextCooling.income - cooling.income}/s
+                            </div>
+                            <div className="text-[10px] text-yellow-400 mb-1">
+                              +{nextCooling.energy - cooling.energy}⚡
+                            </div>
+                            <div className="text-[10px] text-red-400 mb-1">
+                              {nextCooling.co2 - cooling.co2 > 0 ? '+' : ''}
+                              {nextCooling.co2 - cooling.co2} CO₂
+                            </div>
+                            <button
+                              onClick={() => store.upgradeCooling(index)}
+                              disabled={
+                                store.money <
+                                nextCooling.cost * (1 - store.globalModifiers.costReduction)
+                              }
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
+                            >
+                              $
+                              {(
+                                nextCooling.cost *
+                                (1 - store.globalModifiers.costReduction)
+                              ).toLocaleString()}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  } else {
+                    const baseCooling = COOLING_SYSTEMS[0]
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800"
+                        onClick={() => store.buyCooling(index)}
+                      >
+                        <span className="text-xs text-gray-500">Empty</span>
+                        <div className="text-xs text-green-400 font-bold">+ Buy</div>
+                        <div className="text-[10px] text-gray-400">
+                          $
+                          {(
+                            baseCooling.cost *
+                            (1 - store.globalModifiers.costReduction)
+                          ).toLocaleString()}
+                        </div>
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Backup Systems Section */}
+          {store.backupSlots.length > 0 && (
+            <>
+              <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4 mt-6">
+                <h3 className="font-bold text-gray-300">
+                  Backup Systems ({store.backupSlots.filter((s) => s).length}/3)
+                </h3>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {Array.from({ length: 3 }, (_, index) => {
+                  const slot = store.backupSlots[index] || null
+                  if (slot) {
+                    const backup = BACKUP_SYSTEMS[slot.level - 1]
+                    const nextBackup = BACKUP_SYSTEMS[slot.level]
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center z-0"
+                      >
+                        <div className="text-2xl mb-1">{backup.icon}</div>
+                        <div className="font-bold text-xs text-white truncate">{backup.name}</div>
+                        <div className="text-[10px] text-green-400">+${backup.income}/s</div>
+                        <div className="text-[10px] text-yellow-400">+{backup.energy}⚡</div>
+                        <div className="text-[10px] text-red-400">+{backup.co2} CO₂</div>
+
+                        {nextBackup && (
+                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
+                            <div className="text-[10px] text-gray-300 mb-1">
+                              Upgrade to {nextBackup.name}
+                            </div>
+                            <div className="text-[10px] text-green-400 mb-1">
+                              +${nextBackup.income - backup.income}/s
+                            </div>
+                            <div className="text-[10px] text-yellow-400 mb-1">
+                              +{nextBackup.energy - backup.energy}⚡
+                            </div>
+                            <div className="text-[10px] text-red-400 mb-1">
+                              {nextBackup.co2 - backup.co2 > 0 ? '+' : ''}
+                              {nextBackup.co2 - backup.co2} CO₂
+                            </div>
+                            <button
+                              onClick={() => store.upgradeBackup(index)}
+                              disabled={
+                                store.money <
+                                nextBackup.cost * (1 - store.globalModifiers.costReduction)
+                              }
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
+                            >
+                              $
+                              {(
+                                nextBackup.cost *
+                                (1 - store.globalModifiers.costReduction)
+                              ).toLocaleString()}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  } else {
+                    const baseBackup = BACKUP_SYSTEMS[0]
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800"
+                        onClick={() => store.buyBackup(index)}
+                      >
+                        <span className="text-xs text-gray-500">Empty</span>
+                        <div className="text-xs text-green-400 font-bold">+ Buy</div>
+                        <div className="text-[10px] text-gray-400">
+                          $
+                          {(
+                            baseBackup.cost *
+                            (1 - store.globalModifiers.costReduction)
+                          ).toLocaleString()}
+                        </div>
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">

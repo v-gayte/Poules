@@ -509,6 +509,102 @@ export const TEACHERS: Teacher[] = [
   { level: 10, name: 'Entité I.A.', cost: 3000000, energy: 15, income: 350000, icon: '✨' },
 ]
 
+// --- 3.5. COOLING SYSTEMS (Server Room) ---
+export interface CoolingSystem {
+  level: number
+  name: string
+  cost: number
+  energy: number
+  income: number // Income boost or direct income
+  co2: number
+  icon: string
+}
+
+export const COOLING_SYSTEMS: CoolingSystem[] = [
+  { level: 1, name: 'Ventilateur USB', cost: 300, energy: 2, income: 20, co2: 2, icon: '🌀' },
+  { level: 2, name: 'Ventilo 120mm', cost: 800, energy: 3, income: 50, co2: 3, icon: '💨' },
+  {
+    level: 3,
+    name: 'Watercooling Basique',
+    cost: 2000,
+    energy: 4,
+    income: 120,
+    co2: 4,
+    icon: '💧',
+  },
+  { level: 4, name: 'Radiateur Double', cost: 5000, energy: 5, income: 280, co2: 5, icon: '❄️' },
+  {
+    level: 5,
+    name: 'Refroidissement Phase',
+    cost: 12000,
+    energy: 6,
+    income: 650,
+    co2: 6,
+    icon: '🧊',
+  },
+  { level: 6, name: 'Liquid Nitrogen', cost: 30000, energy: 8, income: 1500, co2: 7, icon: '🌡️' },
+  { level: 7, name: 'Immersion Totale', cost: 75000, energy: 10, income: 3500, co2: 8, icon: '🛁' },
+  { level: 8, name: 'Cryogénie', cost: 180000, energy: 12, income: 8000, co2: 9, icon: '❄️' },
+  { level: 9, name: 'Vide Quantique', cost: 450000, energy: 15, income: 20000, co2: 5, icon: '🌌' },
+  { level: 10, name: 'Zéro Absolu', cost: 1200000, energy: 20, income: 50000, co2: 0, icon: '🔮' },
+]
+
+// --- 3.6. BACKUP SYSTEMS (Server Room) ---
+export interface BackupSystem {
+  level: number
+  name: string
+  cost: number
+  energy: number
+  income: number
+  co2: number
+  icon: string
+}
+
+export const BACKUP_SYSTEMS: BackupSystem[] = [
+  { level: 1, name: 'Disque Dur Externe', cost: 500, energy: 1, income: 30, co2: 1, icon: '💾' },
+  { level: 2, name: 'NAS Basique', cost: 1500, energy: 2, income: 80, co2: 2, icon: '📦' },
+  { level: 3, name: 'RAID 5', cost: 4000, energy: 3, income: 200, co2: 3, icon: '🔀' },
+  { level: 4, name: 'Cloud Backup', cost: 10000, energy: 4, income: 500, co2: 4, icon: '☁️' },
+  { level: 5, name: 'Tape Library', cost: 25000, energy: 5, income: 1200, co2: 5, icon: '📼' },
+  { level: 6, name: 'Mirror Site', cost: 60000, energy: 6, income: 3000, co2: 6, icon: '🪞' },
+  {
+    level: 7,
+    name: 'Blockchain Backup',
+    cost: 150000,
+    energy: 8,
+    income: 7500,
+    co2: 7,
+    icon: '⛓️',
+  },
+  {
+    level: 8,
+    name: 'Quantum Storage',
+    cost: 400000,
+    energy: 10,
+    income: 20000,
+    co2: 8,
+    icon: '⚛️',
+  },
+  {
+    level: 9,
+    name: 'Dimension Parallèle',
+    cost: 1000000,
+    energy: 12,
+    income: 50000,
+    co2: 9,
+    icon: '🌀',
+  },
+  {
+    level: 10,
+    name: 'Backup Temporel',
+    cost: 2500000,
+    energy: 15,
+    income: 125000,
+    co2: 10,
+    icon: '⏰',
+  },
+]
+
 // --- 6. GYM ---
 export interface GymLevel {
   level: number
