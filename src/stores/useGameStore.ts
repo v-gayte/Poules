@@ -13,6 +13,7 @@ import {
   BACKUP_SYSTEMS,
   GYM_LEVELS,
   GYM_ACTIVITIES,
+  LAB_SECTIONS,
   RESEARCH_LAB_LEVELS,
   DEFAULT_MAP,
 } from '../config/gameConfig'
@@ -75,10 +76,11 @@ interface GameState {
   serverRoomLevel: number
   classroomLevel: number
   gymLevel: number
-  researchLabLevel: number // New
+  researchLabLevel: number
+  labSectionLevels: Record<string, number>
 
   unlockedTechs: string[]
-  globalModifiers: GlobalModifiers // New
+  globalModifiers: GlobalModifiers
 
   serverSlots: (ServerSlot | null)[]
   classroomSlots: (ClassroomPCSlot | null)[]
@@ -113,7 +115,7 @@ interface GameState {
   upgradeServerRoom: () => void
   upgradeClassroom: () => void
   upgradeGym: () => void
-  upgradeResearchLab: () => void // New
+  upgradeLabSection: (id: string) => void
 
   setGymProfile: (profile: GymProfile) => void
   performGymActivity: () => void
@@ -152,6 +154,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   classroomLevel: 1,
   gymLevel: 1,
   researchLabLevel: 1,
+  labSectionLevels: { infra: 0, classroom: 0, gym: 0, arcade: 0 },
 
   unlockedTechs: ['T1'],
   globalModifiers: { co2Reduction: 0, costReduction: 0 },
@@ -253,16 +256,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       // Check energy for all current equipment
-      const { serverSlots, classroomSlots, networkSlots, teacherSlots } = get()
+      const { classroomSlots, networkSlots, teacherSlots } = get()
       let totalEnergy = 0
 
-      serverSlots.forEach((slot) => {
-        if (slot) {
-          const asset = SERVER_ASSETS[slot.typeId]
-          const grade = asset.grades.find((g) => g.grade === slot.grade)!
-          // Servers don't consume energy directly, but we check anyway
-        }
-      })
+
 
       classroomSlots.forEach((slot) => {
         if (slot) {
@@ -543,21 +540,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  upgradeResearchLab: () => {
-    const { money, researchLabLevel, globalModifiers, maxCo2 } = get()
-    if (researchLabLevel >= 5) return
+  upgradeLabSection: (sectionId) => {
+    const { money, labSectionLevels, globalModifiers, maxCo2 } = get()
+    const currentLevel = labSectionLevels[sectionId] || 0
+    const section = LAB_SECTIONS[sectionId]
+    
+    if (!section) return
 
-    const nextLevel = RESEARCH_LAB_LEVELS[researchLabLevel]
-    const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
+    // Calculate cost: baseCost * (multiplier ^ currentLevel)
+    const cost = Math.floor(section.baseCost * Math.pow(section.costMultiplier, currentLevel))
+    const discountedCost = cost * (1 - globalModifiers.costReduction)
 
-    if (money >= cost) {
-      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
-      const co2Increase = Math.floor(cost * 0.1)
+    if (money >= discountedCost) {
+      // Increase CO2 capacity
+      const co2Increase = Math.floor(discountedCost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
 
+      const newLevels = { ...labSectionLevels, [sectionId]: currentLevel + 1 }
+
       set({
-        money: money - cost,
-        researchLabLevel: researchLabLevel + 1,
+        money: money - discountedCost,
+        labSectionLevels: newLevels,
         maxCo2: newMaxCo2,
       })
     }
@@ -761,7 +764,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (nextLevel > 10) return
 
     const coolingConfig = COOLING_SYSTEMS[nextLevel - 1]
-    const currentCooling = COOLING_SYSTEMS[slot.level - 1]
     const cost = coolingConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
@@ -1498,8 +1500,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       // Research Lab Income (only if research room is unlocked)
       const researchRoom = state.rooms.find((r) => r.type === 'research')
       const isResearchRoomUnlocked = researchRoom?.unlocked ?? false
-      const researchConfig = RESEARCH_LAB_LEVELS[state.researchLabLevel - 1]
-      const researchIncome = isResearchRoomUnlocked ? researchConfig.rpGeneration : 0
+
+      let researchIncome = 0
+      if (isResearchRoomUnlocked) {
+        Object.entries(state.labSectionLevels || {}).forEach(([sectionId, level]) => {
+          const section = LAB_SECTIONS[sectionId]
+          if (section) {
+            researchIncome += section.baseRp * (level as number)
+          }
+        })
+      }
 
       // Total Energy Usage (PCs + Network + Teachers + Cooling + Backup, not server room base energy)
       const currentEnergyUsage =

@@ -14,11 +14,12 @@ import {
   GYM_LEVELS,
   GYM_QUESTIONS,
   GYM_ACTIVITIES,
-  RESEARCH_LAB_LEVELS,
+  LAB_SECTIONS,
 } from '../config/gameConfig'
 
 export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () => void }) => {
   const store = useGameStore()
+  const [selectedSection, setSelectedSection] = useState<string | null>(null)
 
   const isGenerator = roomId.startsWith('generator')
   const isServer = roomId.startsWith('server')
@@ -572,218 +573,301 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
   }
 
   if (isResearch) {
-    const level = store.researchLabLevel
-    const config = RESEARCH_LAB_LEVELS[level - 1]
-    const nextConfig = RESEARCH_LAB_LEVELS[level]
+    const sections = LAB_SECTIONS
+    const totalRp = Object.entries(store.labSectionLevels || {}).reduce((acc, [id, lvl]) => {
+      const sect = sections[id]
+      return acc + (sect && lvl > 0 ? sect.baseRp * lvl : 0)
+    }, 0)
 
-    // Calculate grid size
-    const gridCellSize = 180
-    const padding = 50
-
-    // Helper to get coordinates
-    const getCoords = (x: number, y: number) => ({
-      left: x * gridCellSize + padding,
-      top: y * gridCellSize + padding,
-    })
-
-    return (
-      <div className="absolute bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 flex z-20 h-[500px] overflow-hidden shadow-2xl">
-        {/* LEFT: Lab Stats */}
-        <div className="w-1/4 border-r border-gray-700 bg-gray-800 p-6 overflow-y-auto flex flex-col gap-4 shadow-lg z-10">
-          <div>
-            <h2 className="text-3xl font-bold text-cyan-400 mb-1">{config.name}</h2>
-            <div className="text-sm text-cyan-200/60 font-mono mb-4">Level {level}</div>
-            <p className="text-gray-400 text-sm leading-relaxed">{config.description}</p>
-          </div>
-
-          <div className="bg-gray-900/80 p-5 rounded-xl border border-gray-600/50 backdrop-blur-sm">
-            <div className="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">
-              Research Output
+    if (!selectedSection) {
+      return (
+        <div className="absolute bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 flex flex-col z-20 h-[550px] overflow-hidden shadow-2xl p-6">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
+                Laboratoire de Recherche
+              </h2>
+              <p className="text-gray-400 text-sm">
+                Gérez vos sections de recherche pour débloquer des technologies.
+              </p>
             </div>
-            <div className="text-4xl font-bold text-purple-400 drop-shadow-lg">
-              +{config.rpGeneration} <span className="text-lg text-purple-500/80">RP/s</span>
+            <div className="text-right">
+              <div className="text-sm text-gray-500 uppercase font-bold">Production Totale</div>
+              <div className="text-4xl font-mono text-purple-400">+{totalRp} RP/s</div>
             </div>
           </div>
 
-          {nextConfig ? (
-            <div className="mt-auto">
-              <div className="text-xs text-gray-400 mb-2 flex justify-between">
-                <span>Next Level</span>
-                <span className="text-green-400 font-bold">
-                  ${(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()}
-                </span>
-              </div>
-              <button
-                onClick={store.upgradeResearchLab}
-                disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction)}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed rounded-lg font-bold text-white shadow-lg transition-all transform active:scale-95"
-              >
-                Upgrade Lab
-              </button>
-            </div>
-          ) : (
-            <div className="mt-auto p-3 text-center bg-gray-900/50 rounded border border-gray-700 text-green-400 font-bold text-sm tracking-wide">
-              MAX LEVEL REACHED
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT: Visual Tech Tree */}
-        <div
-          ref={scrollContainerRef}
-          className="flex-1 overflow-auto relative bg-[#0a0a14] custom-scrollbar cursor-grab active:cursor-grabbing select-none"
-          onMouseDown={handleMouseDown}
-          onMouseLeave={handleMouseLeave}
-          onMouseUp={handleMouseUp}
-          onMouseMove={handleMouseMove}
-        >
-          <div className="min-w-[2600px] min-h-[1600px] relative">
-            {/* Headers */}
-            <div className="absolute top-2 left-[50px] flex gap-[50px] text-white/20 font-bold text-4xl uppercase select-none pointer-events-none">
-              <div style={{ left: 50, top: 20, width: 600 }}>INFRASTRUCTURE</div>
-              <div style={{ left: 800, top: 20, width: 600 }}>CLASSROOMS</div>
-              <div style={{ left: 1500, top: 20, width: 400 }}>GYM</div>
-              <div style={{ left: 2100, top: 20, width: 400 }}>ARCADE</div>
-            </div>
-
-            {/* 1. Connections (SVG Layer) */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
-              <defs>
-                <marker
-                  id="arrowhead"
-                  markerWidth="10"
-                  markerHeight="7"
-                  refX="9"
-                  refY="3.5"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 3.5, 0 7" fill="#4b5563" />
-                </marker>
-                <marker
-                  id="arrowhead-active"
-                  markerWidth="10"
-                  markerHeight="7"
-                  refX="9"
-                  refY="3.5"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7" />
-                </marker>
-              </defs>
-              {TECH_TREE.map((tech) =>
-                tech.reqs.map((reqId) => {
-                  const reqNode = TECH_TREE.find((t) => t.id === reqId)
-                  if (!reqNode) return null
-
-                  const start = getCoords(reqNode.position.x, reqNode.position.y)
-                  const end = getCoords(tech.position.x, tech.position.y)
-
-                  // Add offset to center of nodes (nodes are approx 64x64 or more, let's assume center is +3rem/2 = 24px + padding?)
-                  // Actually let's assume standard CSS width/height. width-48 = 12rem = 192px? No w-48 is 12rem = 192px.
-                  // Let's refine node size. I'll use w-40 (160px). Center is 80px.
-
-                  const offset = 60 // Approximate center offset for the node card
-
-                  const isUnlocked = store.unlockedTechs.includes(tech.id)
-                  const isReqMet = store.unlockedTechs.includes(reqId)
-
-                  return (
-                    <line
-                      key={`${reqId}-${tech.id}`}
-                      x1={start.left + offset}
-                      y1={start.top + offset}
-                      x2={end.left + offset}
-                      y2={end.top + offset}
-                      stroke={isReqMet ? (isUnlocked ? '#a855f7' : '#a855f7') : '#374151'}
-                      strokeWidth={2}
-                      strokeDasharray={isReqMet ? '0' : '5,5'}
-                      markerEnd={isReqMet ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
-                      opacity={0.6}
-                    />
-                  )
-                })
-              )}
-            </svg>
-
-            {/* 2. Nodes */}
-            {TECH_TREE.map((tech) => {
-              const { left, top } = getCoords(tech.position.x, tech.position.y)
-              const isUnlocked = store.unlockedTechs.includes(tech.id)
-              const isReqMet = tech.reqs.every((r) => store.unlockedTechs.includes(r))
-              const canUnlock = !isUnlocked && isReqMet && store.research >= tech.cost
+          {/* Grid */}
+          <div className="grid grid-cols-4 gap-6 h-full overflow-y-auto pb-10">
+            {Object.entries(sections).map(([id, section]) => {
+              const level = store.labSectionLevels[id] || 0
+              const isUnlocked = level > 0
+              const nextCost = Math.floor(
+                section.baseCost * Math.pow(section.costMultiplier, level)
+              )
+              const rpOutput = section.baseRp * level
 
               return (
                 <div
-                  key={tech.id}
-                  style={{ left, top }}
-                  className={`absolute w-[120px] p-2 rounded-lg border-2 flex flex-col gap-1 transition-all duration-300 z-10 group
-                    ${
-                      isUnlocked
-                        ? 'bg-purple-900/40 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
-                        : isReqMet
-                          ? canUnlock
-                            ? 'bg-gray-800 border-gray-400 hover:border-white hover:shadow-lg cursor-pointer'
-                            : 'bg-gray-800 border-gray-600 opacity-80'
-                          : 'bg-gray-900 border-gray-800 opacity-50 grayscale'
-                    }
-                  `}
+                  key={id}
+                  className={`relative rounded-xl border-2 p-4 flex flex-col gap-3 transition-colors ${
+                    isUnlocked
+                      ? 'bg-gray-800 border-gray-600'
+                      : 'bg-gray-900/50 border-gray-800 border-dashed hover:border-gray-700'
+                  }`}
                 >
-                  <div className="text-[10px] font-bold text-gray-500 uppercase">
-                    {tech.category}
-                  </div>
-                  <div
-                    className={`font-bold text-xs leading-tight ${isUnlocked ? 'text-white' : 'text-gray-300'}`}
-                  >
-                    {tech.name}
-                  </div>
-
-                  {!isUnlocked && (
-                    <div
-                      className={`text-[10px] font-mono mt-1 ${canUnlock ? 'text-purple-300' : 'text-gray-500'}`}
-                    >
-                      {tech.cost} RP
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="text-4xl bg-gray-900 p-3 rounded-lg shadow-inner">
+                      {section.icon}
                     </div>
-                  )}
-
-                  {isUnlocked && (
-                    <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow-md">
-                      ✓
-                    </div>
-                  )}
-
-                  {/* HOVER TOOLTIP */}
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 p-3 bg-black/90 border border-gray-700 text-white text-xs rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                    <p className="font-bold mb-1 text-purple-300">{tech.name}</p>
-                    <p className="text-gray-300 mb-2">{tech.description}</p>
-                    <div className="border-t border-gray-800 pt-1 mt-1 flex justify-between text-[10px] text-gray-500">
-                      <span>Cost: {tech.cost} RP</span>
-                      <span>ID: {tech.id}</span>
+                    <div>
+                      <div className={`font-bold text-lg ${section.color}`}>{section.name}</div>
+                      <div className="text-xs text-gray-400 font-mono">Niveau {level}</div>
                     </div>
                   </div>
 
-                  {/* ACTION BUTTION (Overlay) */}
-                  {canUnlock && (
-                    <button
-                      onClick={() => store.unlockTech(tech.id)}
-                      className="absolute inset-0 bg-purple-600/10 hover:bg-purple-600/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all font-bold text-xs text-white uppercase tracking-wider backdrop-blur-[1px]"
-                    >
-                      Unlock
-                    </button>
-                  )}
+                  <p className="text-xs text-gray-500 h-10 overflow-hidden">
+                    {section.description}
+                  </p>
+
+                  <div className="mt-auto flex flex-col gap-2">
+                    {isUnlocked ? (
+                      <>
+                        <div className="flex justify-between text-xs font-mono bg-black/30 p-2 rounded">
+                          <span>Total Output:</span>
+                          <span className="text-purple-300">+{rpOutput} RP/s</span>
+                        </div>
+
+                        {/* Button 1: UPGRADE */}
+                        <button
+                          onClick={() => store.upgradeLabSection(id)}
+                          disabled={store.money < nextCost}
+                          className="w-full py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-xs font-bold rounded flex justify-between px-3 items-center border border-gray-600 hover:border-green-500 transition-all group"
+                        >
+                          <span>AMÉLIORER</span>
+                          <span
+                            className={`${
+                              store.money >= nextCost ? 'text-green-400' : 'text-red-400'
+                            } group-hover:text-green-300`}
+                          >
+                            ${nextCost.toLocaleString()}
+                          </span>
+                        </button>
+
+                        {/* Button 2: ENTER LAB (Primary Action) */}
+                        <button
+                          onClick={() => setSelectedSection(id)}
+                          className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded shadow-lg transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                          <span>OUVRIR L'ARBRE</span>
+                          <span>➜</span>
+                        </button>
+                      </>
+                    ) : (
+                      /* UNLOCK BUTTON */
+                      <button
+                        onClick={() => store.upgradeLabSection(id)}
+                        disabled={store.money < nextCost}
+                        className="w-full py-4 mt-2 bg-green-700 hover:bg-green-600 disabled:bg-gray-800 disabled:text-gray-500 text-white font-bold rounded shadow-lg uppercase tracking-wider"
+                      >
+                        Débloquer (${nextCost.toLocaleString()})
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}
           </div>
-        </div>
 
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white z-50 bg-gray-900/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
-        >
-          ✕
-        </button>
-      </div>
-    )
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+      )
+    } else {
+      // --- VIEW 2: TECH TREE ---
+      const section = LAB_SECTIONS[selectedSection]
+      // Calculate grid size
+      const gridCellSize = 180
+      const padding = 50
+
+      // Helper to get coordinates
+      const getCoords = (x: number, y: number) => ({
+        left: x * gridCellSize + padding,
+        top: y * gridCellSize + padding,
+      })
+
+      return (
+        <div className="absolute bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 flex z-20 h-[500px] overflow-hidden shadow-2xl">
+          {/* HEADER BAR */}
+          <div className="absolute top-0 left-0 right-0 h-16 bg-gray-800/90 backdrop-blur border-b border-gray-700 flex items-center px-6 z-30 justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setSelectedSection(null)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white font-bold flex items-center gap-2"
+              >
+                <span>⬅</span> Retour au Dashboard
+              </button>
+              <div className="h-8 w-px bg-gray-600 mx-2"></div>
+              <h2 className={`text-2xl font-bold ${section.color}`}>{section.name}</h2>
+            </div>
+            <div className="text-purple-400 font-bold font-mono">
+              Research Points: {store.research.toLocaleString()}
+            </div>
+          </div>
+
+          {/* VISUAL TECH TREE */}
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-auto relative bg-[#0a0a14] custom-scrollbar cursor-grab active:cursor-grabbing select-none mt-16"
+            onMouseDown={handleMouseDown}
+            onMouseLeave={handleMouseLeave}
+            onMouseUp={handleMouseUp}
+            onMouseMove={handleMouseMove}
+          >
+            <div className="min-w-[2600px] min-h-[1600px] relative">
+              {/* 1. Connections (SVG Layer) */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                <defs>
+                  <marker
+                    id="arrowhead"
+                    markerWidth="10"
+                    markerHeight="7"
+                    refX="9"
+                    refY="3.5"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#4b5563" />
+                  </marker>
+                  <marker
+                    id="arrowhead-active"
+                    markerWidth="10"
+                    markerHeight="7"
+                    refX="9"
+                    refY="3.5"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7" />
+                  </marker>
+                </defs>
+                {TECH_TREE.filter(
+                  (t) =>
+                    t.category.toLowerCase() === selectedSection ||
+                    (selectedSection === 'infra' &&
+                      ['ecology', 'economy'].includes(t.category.toLowerCase()))
+                ).map((tech) =>
+                  tech.reqs.map((reqId) => {
+                    const reqNode = TECH_TREE.find((t) => t.id === reqId)
+                    if (!reqNode) return null
+
+                    const start = getCoords(reqNode.position.x, reqNode.position.y)
+                    const end = getCoords(tech.position.x, tech.position.y)
+                    const offset = 60
+                    const isUnlocked = store.unlockedTechs.includes(tech.id)
+                    const isReqMet = store.unlockedTechs.includes(reqId)
+
+                    return (
+                      <line
+                        key={`${reqId}-${tech.id}`}
+                        x1={start.left + offset}
+                        y1={start.top + offset}
+                        x2={end.left + offset}
+                        y2={end.top + offset}
+                        stroke={isReqMet ? '#a855f7' : '#374151'}
+                        strokeWidth={2}
+                        strokeDasharray={isReqMet ? '0' : '5,5'}
+                        markerEnd={isReqMet ? 'url(#arrowhead-active)' : 'url(#arrowhead)'}
+                        opacity={0.6}
+                      />
+                    )
+                  })
+                )}
+              </svg>
+
+              {/* 2. Nodes */}
+              {TECH_TREE.filter(
+                (t) =>
+                  t.category.toLowerCase() === selectedSection ||
+                  (selectedSection === 'infra' &&
+                    ['ecology', 'economy'].includes(t.category.toLowerCase()))
+              ).map((tech) => {
+                const { left, top } = getCoords(tech.position.x, tech.position.y)
+                const isUnlocked = store.unlockedTechs.includes(tech.id)
+                const isReqMet = tech.reqs.every((r) => store.unlockedTechs.includes(r))
+                const canUnlock = !isUnlocked && isReqMet && store.research >= tech.cost
+
+                return (
+                  <div
+                    key={tech.id}
+                    style={{ left, top }}
+                    className={`absolute w-[120px] p-2 rounded-lg border-2 flex flex-col gap-1 transition-all duration-300 z-10 group
+                      ${
+                        isUnlocked
+                          ? 'bg-purple-900/40 border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
+                          : isReqMet
+                            ? canUnlock
+                              ? 'bg-gray-800 border-gray-400 hover:border-white hover:shadow-lg cursor-pointer'
+                              : 'bg-gray-800 border-gray-600 opacity-80'
+                            : 'bg-gray-900 border-gray-800 opacity-50 grayscale'
+                      }
+                    `}
+                  >
+                    <div className="text-[10px] font-bold text-gray-500 uppercase">
+                      {tech.category}
+                    </div>
+                    <div
+                      className={`font-bold text-xs leading-tight ${
+                        isUnlocked ? 'text-white' : 'text-gray-300'
+                      }`}
+                    >
+                      {tech.name}
+                    </div>
+
+                    {!isUnlocked && (
+                      <div
+                        className={`text-[10px] font-mono mt-1 ${
+                          canUnlock ? 'text-purple-300' : 'text-gray-500'
+                        }`}
+                      >
+                        {tech.cost} RP
+                      </div>
+                    )}
+
+                    {isUnlocked && (
+                      <div className="absolute -top-2 -right-2 bg-purple-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full shadow-md">
+                        ✓
+                      </div>
+                    )}
+
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-48 p-3 bg-black/90 border border-gray-700 text-white text-xs rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                      <p className="font-bold mb-1 text-purple-300">{tech.name}</p>
+                      <p className="text-gray-300 mb-2">{tech.description}</p>
+                      <div className="border-t border-gray-800 pt-1 mt-1 flex justify-between text-[10px] text-gray-500">
+                        <span>Cost: {tech.cost} RP</span>
+                        <span>ID: {tech.id}</span>
+                      </div>
+                    </div>
+
+                    {canUnlock && (
+                      <button
+                        onClick={() => store.unlockTech(tech.id)}
+                        className="absolute inset-0 bg-purple-600/10 hover:bg-purple-600/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all font-bold text-xs text-white uppercase tracking-wider backdrop-blur-[1px]"
+                      >
+                        Unlock
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )
+    }
   }
 
   if (isServer) {
