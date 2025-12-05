@@ -114,7 +114,18 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
   }
 
   if (isClassroom) {
-    const level = store.classroomLevel
+    const classroomData = store.classrooms[roomId]
+    // Fallback if data missing (should not happen if initialized correctly)
+    if (!classroomData) {
+        return (
+             <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex items-center justify-center z-20 h-96">
+                <span className="text-red-500">Error: Classroom data not found for {roomId}</span>
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
+             </div>
+        )
+    }
+
+    const { level, classroomSlots, networkSlots, teacherSlots } = classroomData
     const config = CLASSROOM_LEVELS[level - 1]
     const nextConfig = CLASSROOM_LEVELS[level]
 
@@ -132,24 +143,24 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
             <div className="text-3xl font-bold text-white">8 Slots</div>
           </div>
 
-          {store.networkSlots.length > 0 && (
+          {networkSlots.length > 0 && (
             <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
               <div className="text-sm text-gray-500">Network Slots</div>
-              <div className="text-3xl font-bold text-white">{store.networkSlots.length} / 1</div>
+              <div className="text-3xl font-bold text-white">{networkSlots.length} / 1</div>
             </div>
           )}
 
-          {store.teacherSlots.length > 0 && (
+          {teacherSlots.length > 0 && (
             <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
               <div className="text-sm text-gray-500">Teacher Slots</div>
-              <div className="text-3xl font-bold text-white">{store.teacherSlots.length} / 3</div>
+              <div className="text-3xl font-bold text-white">{teacherSlots.length} / 3</div>
             </div>
           )}
 
-          {store.networkSlots.length === 0 ? (
+          {networkSlots.length === 0 ? (
             nextConfig ? (
               <button
-                onClick={store.upgradeClassroom}
+                onClick={() => store.upgradeClassroom(roomId)}
                 disabled={
                   store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction) ||
                   !!(nextConfig.techReq && !store.unlockedTechs.includes(nextConfig.techReq))
@@ -162,9 +173,9 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
             ) : (
               <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
             )
-          ) : store.teacherSlots.length < 3 ? (
+          ) : teacherSlots.length < 3 ? (
             <button
-              onClick={store.upgradeClassroom}
+              onClick={() => store.upgradeClassroom(roomId)}
               disabled={
                 store.money <
                   (nextConfig
@@ -191,11 +202,11 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
         <div className="flex-1 overflow-y-auto">
           <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4">
             <h3 className="font-bold text-gray-300">
-              Student PCs ({store.classroomSlots.filter((s) => s).length}/8)
+              Student PCs ({classroomSlots.filter((s) => s).length}/8)
             </h3>
           </div>
           <div className="grid grid-cols-5 gap-3">
-            {store.classroomSlots.map((slot, index) => {
+            {classroomSlots.map((slot, index) => {
               if (slot) {
                 const pc = CLASSROOM_PCS[slot.level - 1]
                 const nextPc = CLASSROOM_PCS[slot.level]
@@ -223,7 +234,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                           +{nextPc.co2 - pc.co2} CO₂
                         </div>
                         <button
-                          onClick={() => store.upgradeClassroomPC(index)}
+                          onClick={() => store.upgradeClassroomPC(roomId, index)}
                           disabled={
                             store.money < nextPc.cost * (1 - store.globalModifiers.costReduction)
                           }
@@ -249,7 +260,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                         ? 'opacity-50 pointer-events-none'
                         : ''
                     }`}
-                    onClick={() => store.buyClassroomPC(index)}
+                    onClick={() => store.buyClassroomPC(roomId, index)}
                   >
                     {basePc.techReq && !store.unlockedTechs.includes(basePc.techReq) && (
                       <div className="absolute inset-0 flex items-center justify-center z-10 text-[10px] text-red-500 font-bold bg-black/80 rounded">
@@ -268,16 +279,16 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
           </div>
 
           {/* Network Equipment Slots - Only show if at least one slot exists */}
-          {store.networkSlots.length > 0 && (
+          {networkSlots.length > 0 && (
             <>
               <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4 mt-6">
                 <h3 className="font-bold text-gray-300">
-                  Network Equipment ({store.networkSlots.filter((s) => s).length}/4)
+                  Network Equipment ({networkSlots.filter((s) => s).length}/4)
                 </h3>
               </div>
               <div className="grid grid-cols-5 gap-3">
                 {Array.from({ length: 4 }, (_, index) => {
-                  const slot = store.networkSlots[index] || null
+                  const slot = networkSlots[index] || null
                   if (slot) {
                     const network = NETWORK_EQUIPMENT[slot.level - 1]
                     const nextNetwork = NETWORK_EQUIPMENT[slot.level]
@@ -304,7 +315,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                               +{nextNetwork.energy - network.energy}⚡
                             </div>
                             <button
-                              onClick={() => store.upgradeNetwork(index)}
+                              onClick={() => store.upgradeNetwork(roomId, index)}
                               disabled={
                                 store.money <
                                 nextNetwork.cost * (1 - store.globalModifiers.costReduction)
@@ -331,7 +342,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                             ? 'opacity-50 pointer-events-none'
                             : ''
                         }`}
-                        onClick={() => store.buyNetwork(index)}
+                        onClick={() => store.buyNetwork(roomId, index)}
                       >
                         {baseNetwork.techReq &&
                           !store.unlockedTechs.includes(baseNetwork.techReq) && (
@@ -357,16 +368,16 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
           )}
 
           {/* Teachers Slots - Only show if at least one slot exists */}
-          {store.teacherSlots.length > 0 && (
+          {teacherSlots.length > 0 && (
             <>
               <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4 mt-6">
                 <h3 className="font-bold text-gray-300">
-                  Teachers ({store.teacherSlots.filter((s) => s).length}/3)
+                  Teachers ({teacherSlots.filter((s) => s).length}/3)
                 </h3>
               </div>
               <div className="grid grid-cols-5 gap-3">
                 {Array.from({ length: 3 }, (_, index) => {
-                  const slot = store.teacherSlots[index] || null
+                  const slot = teacherSlots[index] || null
                   if (slot) {
                     const teacher = TEACHERS[slot.level - 1]
                     const nextTeacher = TEACHERS[slot.level]
@@ -393,7 +404,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                               +{nextTeacher.energy - teacher.energy}⚡
                             </div>
                             <button
-                              onClick={() => store.upgradeTeacher(index)}
+                              onClick={() => store.upgradeTeacher(roomId, index)}
                               disabled={
                                 store.money <
                                 nextTeacher.cost * (1 - store.globalModifiers.costReduction)
@@ -420,7 +431,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                             ? 'opacity-50 pointer-events-none'
                             : ''
                         }`}
-                        onClick={() => store.buyTeacher(index)}
+                        onClick={() => store.buyTeacher(roomId, index)}
                       >
                         {baseTeacher.techReq &&
                           !store.unlockedTechs.includes(baseTeacher.techReq) && (
