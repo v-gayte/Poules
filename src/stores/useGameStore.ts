@@ -14,7 +14,6 @@ import {
   GYM_LEVELS,
   GYM_ACTIVITIES,
   LAB_SECTIONS,
-  RESEARCH_LAB_LEVELS,
   DEFAULT_MAP,
 } from '../config/gameConfig'
 
@@ -254,19 +253,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeGenerator: () => {
-    const { money, generatorLevel, globalModifiers } = get()
+    const { money, generatorLevel, unlockedTechs, globalModifiers, setErrorMessage } = get()
     if (generatorLevel >= 10) return
 
     const nextLevel = GENERATOR_LEVELS[generatorLevel]
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money >= cost) {
-      set({
-        money: money - cost,
-        generatorLevel: generatorLevel + 1,
-        energyCapacity: nextLevel.capacity,
-      })
+    if (money < cost) return
+
+    // Check tech requirement
+    if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
+      return
     }
+
+    set({
+      money: money - cost,
+      generatorLevel: generatorLevel + 1,
+      energyCapacity: nextLevel.capacity,
+    })
   },
 
   upgradeServerRoom: () => {
@@ -280,6 +285,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       backupSlots,
       generatorLevel,
       setErrorMessage,
+      classrooms,
     } = get()
 
     // Phase 1: Add first cooling slot (when serverRoomLevel === 1)
@@ -714,21 +720,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  upgradeResearchLab: () => {
-    const { money, researchLabLevel, globalModifiers, maxCo2 } = get()
-    if (researchLabLevel >= 5) return
+  upgradeLabSection: (sectionId) => {
+    const { money, labSectionLevels, globalModifiers, maxCo2 } = get()
+    const currentLevel = labSectionLevels[sectionId] || 0
+    const section = LAB_SECTIONS[sectionId]
 
-    const nextLevel = RESEARCH_LAB_LEVELS[researchLabLevel]
-    const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
+    if (!section) return
 
-    if (money >= cost) {
-      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
-      const co2Increase = Math.floor(cost * 0.1)
+    // Calculate cost: baseCost * (multiplier ^ currentLevel)
+    const cost = Math.floor(section.baseCost * Math.pow(section.costMultiplier, currentLevel))
+    const discountedCost = cost * (1 - globalModifiers.costReduction)
+
+    if (money >= discountedCost) {
+      // Increase CO2 capacity
+      const co2Increase = Math.floor(discountedCost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
 
+      const newLevels = { ...labSectionLevels, [sectionId]: currentLevel + 1 }
+
       set({
-        money: money - cost,
-        researchLabLevel: researchLabLevel + 1,
+        money: money - discountedCost,
+        labSectionLevels: newLevels,
         maxCo2: newMaxCo2,
       })
     }
@@ -838,7 +850,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  buyCooling: (slotIndex) => {
+  buyClassroomPC: (classroomId, slotIndex) => {
     const {
       money,
       classrooms,
@@ -858,6 +870,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (money < cost) return
 
+    // Calculate energy
     let totalEnergy = 0
     Object.values(classrooms).forEach((c) => {
       c.classroomSlots.forEach((s) => {
@@ -880,14 +893,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     totalEnergy += pcConfig.energy
 
     const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    if (totalEnergy > generatorConfig.capacity) {
+    const currentCapacity = generatorConfig.capacity
+
+    if (totalEnergy > currentCapacity) {
       setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
       return
     }
 
     const newSlots = [...classroom.classroomSlots]
     newSlots[slotIndex] = { level: 1 }
-
     set({
       money: money - cost,
       classrooms: { ...classrooms, [classroomId]: { ...classroom, classroomSlots: newSlots } },
@@ -912,9 +926,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!slot) return
     if (slot.level >= 10) return
 
-    const coolingConfig = COOLING_SYSTEMS[nextLevel - 1]
-    const currentCooling = COOLING_SYSTEMS[slot.level - 1]
-    const cost = coolingConfig.cost * (1 - globalModifiers.costReduction)
+    const nextLevelConfig = CLASSROOM_PCS[slot.level]
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
 
@@ -1708,8 +1721,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       })
 
+      // 5. Total CO2 (Servers + Classrooms + Cooling + Backup + Generator)
+      const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
+
       // Add classroom CO2 to total
-      totalCo2 += classroomCo2 + coolingCo2 + backupCo2
+      totalCo2 += classroomCo2 + coolingCo2 + backupCo2 + generatorConfig.co2
 
       // Apply CO2 Reduction from Techs (after adding all sources)
       const currentCo2 = totalCo2 * (1 - state.globalModifiers.co2Reduction)
@@ -1732,7 +1748,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       const currentEnergyUsage =
         classroomEnergy + networkEnergy + teacherEnergy + coolingEnergy + backupEnergy
 
-      const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
       const currentCapacity = generatorConfig.capacity
 
       const isPowered = currentCapacity >= currentEnergyUsage
@@ -1750,7 +1765,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         tick: state.tick + 1,
         money: state.money + finalIncome,
         research: state.research + (isPowered ? researchIncome : 0),
-        co2: currentCo2, // Current CO2 level (not accumulated, like energy)
+        co2: Math.min(state.maxCo2, state.co2 + currentCo2), // Accumulate CO2
         energyCapacity: currentCapacity,
         energyUsage: currentEnergyUsage,
         studentCount: visualStudents,

@@ -116,6 +116,22 @@ export class MainScene extends Phaser.Scene {
     });
 
 
+
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      const tileX = Math.floor((pointer.worldX + this.cameras.main.scrollX) / this.gridSize);
+      const tileY = Math.floor((pointer.worldY + this.cameras.main.scrollY) / this.gridSize);
+      
+      console.log(`Clicked tile: ${tileX}, ${tileY}`);
+      
+      // Visual Debug
+      const debugText = this.add.text(pointer.worldX + this.cameras.main.scrollX, pointer.worldY + this.cameras.main.scrollY, `${tileX},${tileY}`, { 
+          fontSize: '16px', 
+          color: '#ff0000', 
+          backgroundColor: '#000000' 
+      });
+      debugText.setDepth(100);
+      this.time.delayedCall(2000, () => debugText.destroy());
+    });
   }
 
   drawGrid() {
@@ -241,6 +257,9 @@ export class MainScene extends Phaser.Scene {
       }
     });
   }
+
+
+
 
 
 
