@@ -1194,6 +1194,61 @@ export const ROOMS = {
   },
 }
 
+// --- 8. LAB SECTIONS (New) ---
+export interface LabSection {
+  id: string
+  name: string
+  description: string
+  baseCost: number
+  costMultiplier: number
+  baseRp: number
+  icon: string
+  color: string
+}
+
+export const LAB_SECTIONS: Record<string, LabSection> = {
+  infra: {
+    id: 'infra',
+    name: 'Infrastructure',
+    description: 'Améliore la gestion des serveurs et l\'Ecology',
+    baseCost: 2000,
+    costMultiplier: 1.5,
+    baseRp: 2,
+    icon: '💾',
+    color: 'text-blue-400',
+  },
+  classroom: {
+    id: 'classroom',
+    name: 'Pédagogie',
+    description: 'Débloque les technologies d\'enseignement',
+    baseCost: 5000,
+    costMultiplier: 1.6,
+    baseRp: 5,
+    icon: '🎓',
+    color: 'text-yellow-400',
+  },
+  gym: {
+    id: 'gym',
+    name: 'Performance',
+    description: 'Technologies sportives et productivité',
+    baseCost: 8000,
+    costMultiplier: 1.7,
+    baseRp: 8,
+    icon: '💪',
+    color: 'text-pink-400',
+  },
+  arcade: {
+    id: 'arcade',
+    name: 'Divertissement',
+    description: 'Technologies ludiques et engagement',
+    baseCost: 15000,
+    costMultiplier: 1.8,
+    baseRp: 15,
+    icon: '🕹️',
+    color: 'text-purple-400',
+  },
+}
+
 export const DEFAULT_MAP = [
   // Top
   {
