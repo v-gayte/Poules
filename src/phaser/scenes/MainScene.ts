@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { useGameStore } from '../../stores/useGameStore';
 import { ROOMS } from '../../config/gameConfig';
+import tilesetImg from '../../assets/CoolSchool_tileset.png';
+import levelJsonUrl from '../../assets/poules.json?url';
 
 export class MainScene extends Phaser.Scene {
   private gridSize = 48;
@@ -12,9 +14,30 @@ export class MainScene extends Phaser.Scene {
     this.unsubscribe = () => {};
   }
 
+  preload() {
+    this.load.image('tiles', tilesetImg);
+    this.load.tilemapTiledJSON('map', levelJsonUrl);
+  }
+
   create() {
     this.cameras.main.setBackgroundColor('#1a202c');
-    this.drawGrid();
+    
+    const map = this.make.tilemap({ key: 'map' });
+    const tileset = map.addTilesetImage('CoolSchool_tileset', 'tiles');
+
+    if (tileset) {
+        map.layers.forEach((_, index) => {
+            map.createLayer(index, tileset, 0, 0);
+        });
+    }
+
+    // Center camera and zoom out
+    const mapWidth = map.widthInPixels;
+    const mapHeight = map.heightInPixels;
+    this.cameras.main.centerOn(mapWidth / 2, mapHeight / 2);
+    this.cameras.main.setZoom(0.5);
+
+    // this.drawGrid(); // Grid is less useful with the full map art, disabling for now or keeping it subtle
 
     // Subscribe to store changes
     this.unsubscribe = useGameStore.subscribe((state) => {
@@ -29,31 +52,48 @@ export class MainScene extends Phaser.Scene {
 
     // Input handling
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-        const x = Math.floor(pointer.worldX / this.gridSize);
-        const y = Math.floor(pointer.worldY / this.gridSize);
-        
-        const state = useGameStore.getState();
-        
-        const room = state.rooms.find(r => {
-            const config = ROOMS[r.type];
-            return x >= r.x && x < r.x + config.width && y >= r.y && y < r.y + config.height;
-        });
-        
-        if (room) {
-            if (room.unlocked) {
-                state.setInspectedRoomId(room.id);
+        if (pointer.button === 0) { // Left click for interaction
+            const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+            const x = Math.floor(worldPoint.x / this.gridSize);
+            const y = Math.floor(worldPoint.y / this.gridSize);
+            
+            const state = useGameStore.getState();
+            
+            const room = state.rooms.find(r => {
+                const config = ROOMS[r.type as keyof typeof ROOMS];
+                return x >= r.x && x < r.x + config.width && y >= r.y && y < r.y + config.height;
+            });
+            
+            if (room) {
+                if (room.unlocked) {
+                    state.setInspectedRoomId(room.id);
+                } else {
+                    state.unlockRoom(room.id);
+                }
             } else {
-                state.unlockRoom(room.id);
+                state.setInspectedRoomId(null);
             }
-        } else {
-            state.setInspectedRoomId(null);
         }
+    });
+
+    // Camera Panning
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+        if (pointer.isDown) {
+            this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
+            this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
+        }
+    });
+
+    // Zoom
+    this.input.on('wheel', (pointer: Phaser.Input.Pointer, gameObjects: any, deltaX: number, deltaY: number, deltaZ: number) => {
+        const zoom = this.cameras.main.zoom - deltaY * 0.001;
+        this.cameras.main.setZoom(Phaser.Math.Clamp(zoom, 0.2, 2));
     });
 
     // Student Loop
     this.time.addEvent({
         delay: 2000, // Move every 2 seconds
-        callback: this.moveStudents,
+        callback: () => this.moveStudents(mapWidth, mapHeight),
         callbackScope: this,
         loop: true
     });
@@ -63,8 +103,8 @@ export class MainScene extends Phaser.Scene {
     const graphics = this.add.graphics();
     graphics.lineStyle(1, 0x2d3748, 0.5);
 
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const width = 4000;
+    const height = 4000;
 
     for (let x = 0; x < width; x += this.gridSize) {
       graphics.moveTo(x, 0);
@@ -83,7 +123,7 @@ export class MainScene extends Phaser.Scene {
     this.children.list.filter(child => child.name === 'room').forEach(child => child.destroy());
 
     rooms.forEach(room => {
-      const config = ROOMS[room.type];
+      const config = ROOMS[room.type as keyof typeof ROOMS];
       if (!config) return;
 
       const pixelX = room.x * this.gridSize;
@@ -129,8 +169,6 @@ export class MainScene extends Phaser.Scene {
           costText.setOrigin(0.5);
           costText.setName('room');
       } else {
-          // Check if this room was just unlocked (simple check: if it has no tween yet?)
-          // For now, just ensuring unlocked rooms are full alpha
           rect.setAlpha(1);
       }
     });
@@ -138,15 +176,12 @@ export class MainScene extends Phaser.Scene {
 
   updateStudents(count: number) {
     if (!this.sys || !this.sys.isActive()) return;
-    // Simple logic: If count > current, add. If count < current, remove.
-    // For performance, cap visual students at say 50.
     const visualCount = Math.min(count, 50);
     
     if (this.students.length < visualCount) {
         const toAdd = visualCount - this.students.length;
         for (let i = 0; i < toAdd; i++) {
             const student = this.add.text(0, 0, '🎓', { fontSize: '16px' });
-            // Random start pos
             student.x = Phaser.Math.Between(0, this.scale.width);
             student.y = Phaser.Math.Between(0, this.scale.height);
             this.students.push(student);
@@ -160,19 +195,23 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  moveStudents() {
+  moveStudents(mapWidth: number, mapHeight: number) {
     this.students.forEach(student => {
-        // Random walk
         const dx = Phaser.Math.Between(-1, 1) * this.gridSize;
         const dy = Phaser.Math.Between(-1, 1) * this.gridSize;
         
-        this.tweens.add({
-            targets: student,
-            x: student.x + dx,
-            y: student.y + dy,
-            duration: 1000,
-            ease: 'Linear'
-        });
+        const newX = student.x + dx;
+        const newY = student.y + dy;
+
+        if (newX >= 0 && newX < mapWidth && newY >= 0 && newY < mapHeight) {
+            this.tweens.add({
+                targets: student,
+                x: newX,
+                y: newY,
+                duration: 1000,
+                ease: 'Linear'
+            });
+        }
     });
   }
 

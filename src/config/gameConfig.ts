@@ -293,12 +293,32 @@ export const ROOMS = {
     height: 2,
     color: 0x00ffff,
   },
+  arcade: {
+    id: 'arcade',
+    name: 'Arcade',
+    description: 'Fun & Games',
+    cost: 8000,
+    emoji: '👾',
+    width: 2,
+    height: 2,
+    color: 0xff00aa,
+  },
 };
 
 export const DEFAULT_MAP = [
-  { id: 'generator-main', type: 'generator', x: 2, y: 2, unlocked: false, cost: 0 },
-  { id: 'server-main', type: 'server', x: 5, y: 2, unlocked: false, cost: 0 },
-  { id: 'classroom-main', type: 'classroom', x: 2, y: 6, unlocked: true, cost: 0 },
-  { id: 'gym-main', type: 'gym', x: 9, y: 2, unlocked: false, cost: 5000 },
-  { id: 'research-main', type: 'research', x: 6, y: 6, unlocked: false, cost: 10000 },
+  // Top
+  { id: 'research-main', type: 'research', x: 48, y: 15, unlocked: false, cost: 10000 },
+  
+  // Middle Left
+  { id: 'server-main', type: 'server', x: 36, y: 35, unlocked: false, cost: 0 },
+  
+  // Middle Right
+  { id: 'gym-main', type: 'gym', x: 60, y: 28, unlocked: false, cost: 5000 },
+  { id: 'arcade-main', type: 'arcade', x: 61, y: 42, unlocked: false, cost: 8000 },
+
+  // Bottom
+  { id: 'classroom-0', type: 'classroom', x: 15, y: 57, unlocked: false, cost: 5000 },
+  { id: 'classroom-1', type: 'classroom', x: 30, y: 57, unlocked: true, cost: 0 },
+  { id: 'classroom-2', type: 'classroom', x: 65, y: 57, unlocked: false, cost: 5000 },
+  { id: 'classroom-3', type: 'classroom', x: 80, y: 57, unlocked: false, cost: 15000 },
 ];
