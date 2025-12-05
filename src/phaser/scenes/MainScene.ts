@@ -41,8 +41,8 @@ export class MainScene extends Phaser.Scene {
     // Center camera and zoom out
     const mapWidth = map.widthInPixels;
     const mapHeight = map.heightInPixels;
-    this.cameras.main.centerOn(mapWidth / 2, mapHeight / 2);
-    this.cameras.main.setZoom(0.5);
+    this.cameras.main.centerOn(2315, 2000);
+    this.cameras.main.setZoom(0.20);
 
     // Subscribe to store changes
     this.unsubscribe = useGameStore.subscribe((state) => {
