@@ -73,7 +73,7 @@ interface GameState {
   // Progression
   generatorLevel: number
   serverRoomLevel: number
-  classroomLevel: number
+  // classroomLevel removed
   gymLevel: number
   researchLabLevel: number // New
 
@@ -81,11 +81,15 @@ interface GameState {
   globalModifiers: GlobalModifiers // New
 
   serverSlots: (ServerSlot | null)[]
-  classroomSlots: (ClassroomPCSlot | null)[]
-  networkSlots: (NetworkSlot | null)[]
-  teacherSlots: (TeacherSlot | null)[]
+  // classroomSlots removed
+  // networkSlots removed
+  // teacherSlots removed
   coolingSlots: (CoolingSlot | null)[]
+
   backupSlots: (BackupSlot | null)[]
+  
+  // Classrooms (Multi-instance)
+  classrooms: Record<string, ClassroomData>
 
   // Gym
   gymProfile: GymProfile | null
@@ -111,7 +115,7 @@ interface GameState {
 
   upgradeGenerator: () => void
   upgradeServerRoom: () => void
-  upgradeClassroom: () => void
+  upgradeClassroom: (classroomId: string) => void
   upgradeGym: () => void
   upgradeResearchLab: () => void // New
 
@@ -122,14 +126,14 @@ interface GameState {
   buyServer: (typeId: string) => void
   upgradeServer: (slotIndex: number) => void
 
-  buyClassroomPC: (slotIndex: number) => void
-  upgradeClassroomPC: (slotIndex: number) => void
+  buyClassroomPC: (classroomId: string, slotIndex: number) => void
+  upgradeClassroomPC: (classroomId: string, slotIndex: number) => void
 
-  buyNetwork: (slotIndex: number) => void
-  upgradeNetwork: (slotIndex: number) => void
+  buyNetwork: (classroomId: string, slotIndex: number) => void
+  upgradeNetwork: (classroomId: string, slotIndex: number) => void
 
-  buyTeacher: (slotIndex: number) => void
-  upgradeTeacher: (slotIndex: number) => void
+  buyTeacher: (classroomId: string, slotIndex: number) => void
+  upgradeTeacher: (classroomId: string, slotIndex: number) => void
 
   buyCooling: (slotIndex: number) => void
   upgradeCooling: (slotIndex: number) => void
@@ -138,6 +142,40 @@ interface GameState {
   upgradeBackup: (slotIndex: number) => void
 
   tickUpdate: () => void
+}
+
+interface ClassroomData {
+  level: number
+  classroomSlots: (ClassroomPCSlot | null)[]
+  networkSlots: (NetworkSlot | null)[]
+  teacherSlots: (TeacherSlot | null)[]
+}
+
+const INITIAL_CLASSROOMS: Record<string, ClassroomData> = {
+  'classroom-0': {
+    level: 1,
+    classroomSlots: new Array(8).fill(null).map((_, i) => (i === 0 ? { level: 1 } : null)),
+    networkSlots: [],
+    teacherSlots: [],
+  },
+  'classroom-1': {
+    level: 1,
+    classroomSlots: new Array(8).fill(null).map((_, i) => (i === 0 ? { level: 1 } : null)),
+    networkSlots: [],
+    teacherSlots: [],
+  },
+  'classroom-2': {
+    level: 1,
+    classroomSlots: new Array(8).fill(null).map((_, i) => (i === 0 ? { level: 1 } : null)),
+    networkSlots: [],
+    teacherSlots: [],
+  },
+  'classroom-3': {
+    level: 1,
+    classroomSlots: new Array(8).fill(null).map((_, i) => (i === 0 ? { level: 1 } : null)),
+    networkSlots: [],
+    teacherSlots: [],
+  },
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -149,7 +187,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   generatorLevel: 1,
   serverRoomLevel: 1,
-  classroomLevel: 1,
+  // classroomLevel removed
   gymLevel: 1,
   researchLabLevel: 1,
 
@@ -160,13 +198,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const slots = new Array(30).fill(null) // Max capacity from level 10
     return slots
   })(),
-  classroomSlots: (() => {
-    const slots = new Array(8).fill(null) // Fixed capacity of 8 PCs
-    slots[0] = { level: 1 } // Start with 1 PC
-    return slots
-  })(),
-  networkSlots: [], // Max 1 network equipment
-  teacherSlots: [], // Max 3 teachers
+  // classroomSlots removed
+  // networkSlots removed
+  // teacherSlots removed
+  
+  classrooms: INITIAL_CLASSROOMS,
+
   coolingSlots: [], // Max 3 cooling systems
   backupSlots: [], // Max 3 backup systems
 
@@ -253,7 +290,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       // Check energy for all current equipment
-      const { serverSlots, classroomSlots, networkSlots, teacherSlots } = get()
+      const { serverSlots, classrooms } = get()
       let totalEnergy = 0
 
       serverSlots.forEach((slot) => {
@@ -264,25 +301,16 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       })
 
-      classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          totalEnergy += pc.energy
-        }
-      })
-
-      networkSlots.forEach((slot) => {
-        if (slot) {
-          const network = NETWORK_EQUIPMENT[slot.level - 1]
-          totalEnergy += network.energy
-        }
-      })
-
-      teacherSlots.forEach((slot) => {
-        if (slot) {
-          const teacher = TEACHERS[slot.level - 1]
-          totalEnergy += teacher.energy
-        }
+      Object.values(classrooms).forEach(c => {
+        c.classroomSlots.forEach(s => {
+          if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
+        })
+        c.networkSlots.forEach(s => {
+          if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
+        })
+        c.teacherSlots.forEach(s => {
+          if (s) totalEnergy += TEACHERS[s.level - 1].energy
+        })
       })
 
       const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
@@ -318,32 +346,21 @@ export const useGameStore = create<GameState>((set, get) => ({
       // Check energy
       const {
         serverSlots,
-        classroomSlots,
-        networkSlots,
-        teacherSlots,
+        classrooms,
         coolingSlots: currentCooling,
       } = get()
       let totalEnergy = 0
 
-      classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          totalEnergy += pc.energy
-        }
-      })
-
-      networkSlots.forEach((slot) => {
-        if (slot) {
-          const network = NETWORK_EQUIPMENT[slot.level - 1]
-          totalEnergy += network.energy
-        }
-      })
-
-      teacherSlots.forEach((slot) => {
-        if (slot) {
-          const teacher = TEACHERS[slot.level - 1]
-          totalEnergy += teacher.energy
-        }
+      Object.values(classrooms).forEach(c => {
+        c.classroomSlots.forEach(s => {
+          if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
+        })
+        c.networkSlots.forEach(s => {
+          if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
+        })
+        c.teacherSlots.forEach(s => {
+          if (s) totalEnergy += TEACHERS[s.level - 1].energy
+        })
       })
 
       currentCooling.forEach((slot) => {
@@ -386,21 +403,24 @@ export const useGameStore = create<GameState>((set, get) => ({
     setErrorMessage('SALLE AU MAXIMUM')
   },
 
-  upgradeClassroom: () => {
+  upgradeClassroom: (classroomId) => {
     const {
       money,
-      classroomLevel,
-      networkSlots,
-      teacherSlots,
+      classrooms,
       globalModifiers,
       generatorLevel,
       setErrorMessage,
       unlockedTechs,
     } = get()
+    
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+
+    const { level, networkSlots, teacherSlots } = classroom
 
     // Level 1: Add first network slot (unlocks network section)
-    if (classroomLevel === 1 && networkSlots.length === 0) {
-      const nextLevel = CLASSROOM_LEVELS[classroomLevel]
+    if (level === 1 && networkSlots.length === 0) {
+      const nextLevel = CLASSROOM_LEVELS[level]
       const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
       if (money < cost) return
@@ -418,14 +438,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       const baseNetwork = NETWORK_EQUIPMENT[0]
       let totalEnergy = 0
 
-      // Calculate current energy from PCs
-      const { classroomSlots } = get()
-      classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          totalEnergy += pc.energy
-        }
+      // Calculate current energy from all classrooms
+      Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => {
+             if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy
+         })
+         c.networkSlots.forEach(s => {
+             if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
+         })
+         c.teacherSlots.forEach(s => {
+             if (s) totalEnergy += TEACHERS[s.level - 1].energy
+         })
       })
+
+      // Add energy from other fixed sources (Cooling/Backup if any - simpler: just reuse logic or re-calc)
+      // Actually simpler: just calculate delta.
+      // But we need total usage.
+      // Let's copy the iteration logic for now or rely on a helper? UseGameStore doesn't handle helpers well inside actions easily.
+      // Let's iterate all cleanly.
+      
+      const { coolingSlots, backupSlots } = get()
+      coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+      backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
 
       // Add energy from potential new network equipment
       totalEnergy += baseNetwork.energy
@@ -438,163 +472,645 @@ export const useGameStore = create<GameState>((set, get) => ({
         return
       }
 
-      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
+      // Increase CO2 capacity
       const { maxCo2 } = get()
       const co2Increase = Math.floor(cost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
 
+      const newClassroom = { ...classroom, level: level + 1, networkSlots: newNetworkSlots }
+
       set({
         money: money - cost,
-        classroomLevel: classroomLevel + 1,
-        networkSlots: newNetworkSlots,
+        classrooms: { ...classrooms, [classroomId]: newClassroom },
         maxCo2: newMaxCo2,
       })
       return
     }
 
-    // Level 2-5: Add teacher slots (unlocks teacher section) - only if network slot exists and less than 3 teachers
-    if (classroomLevel >= 2 && networkSlots.length > 0 && teacherSlots.length < 3) {
-      // Use the cost of the current level for adding teacher slot
-      const currentLevel = CLASSROOM_LEVELS[classroomLevel - 1]
+    // Level 2-5: Add teacher slots
+    if (level >= 2 && networkSlots.length > 0 && teacherSlots.length < 3) {
+      const currentLevel = CLASSROOM_LEVELS[level - 1]
       const cost = currentLevel.cost * (1 - globalModifiers.costReduction)
 
       if (money < cost) return
 
-      // Add a new teacher slot
       const newTeacherSlots = [...teacherSlots, null]
-
-      // Check energy for the new teacher slot
+      
       const baseTeacher = TEACHERS[0]
       let totalEnergy = 0
 
-      // Calculate current energy from PCs
-      const { classroomSlots } = get()
-      classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          totalEnergy += pc.energy
-        }
+      Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
       })
+      const { coolingSlots, backupSlots } = get()
+      coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+      backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
 
-      // Calculate current energy from network
-      networkSlots.forEach((slot) => {
-        if (slot) {
-          const network = NETWORK_EQUIPMENT[slot.level - 1]
-          totalEnergy += network.energy
-        }
-      })
-
-      // Add energy from potential new teacher
       totalEnergy += baseTeacher.energy
 
       const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-      const currentCapacity = generatorConfig.capacity
-
-      if (totalEnergy > currentCapacity) {
+      if (totalEnergy > generatorConfig.capacity) {
         setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
         return
       }
 
-      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
       const { maxCo2 } = get()
       const co2Increase = Math.floor(cost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
 
+      const newClassroom = { ...classroom, teacherSlots: newTeacherSlots }
+
       set({
         money: money - cost,
-        teacherSlots: newTeacherSlots,
+        classrooms: { ...classrooms, [classroomId]: newClassroom },
         maxCo2: newMaxCo2,
       })
       return
     }
 
-    // If we have network slot and 3 teachers, classroom is maxed
     if (networkSlots.length > 0 && teacherSlots.length >= 3) {
       setErrorMessage('La salle est au maximum.')
       return
     }
   },
 
-  upgradeGym: () => {
-    const { money, gymLevel, gymProfile, globalModifiers, maxCo2, unlockedTechs, setErrorMessage } =
-      get()
-    if (gymLevel >= 4) return
+  buyClassroomPC: (classroomId, slotIndex) => {
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      coolingSlots,
+      backupSlots
+    } = get()
+    
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+    if (classroom.classroomSlots[slotIndex]) return
 
-    if (gymLevel === 1 && !gymProfile) return
+    const pcConfig = CLASSROOM_PCS[0]
+    const cost = pcConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+
+    totalEnergy += pcConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    if (totalEnergy > generatorConfig.capacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...classroom.classroomSlots]
+    newSlots[slotIndex] = { level: 1 }
+    
+    set({
+      money: money - cost,
+      classrooms: { ...classrooms, [classroomId]: { ...classroom, classroomSlots: newSlots } },
+    })
+  },
+
+  upgradeClassroomPC: (classroomId, slotIndex) => {
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      unlockedTechs,
+      coolingSlots,
+      backupSlots
+    } = get()
+
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+    const slot = classroom.classroomSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextLevelConfig = CLASSROOM_PCS[slot.level]
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
+      return
+    }
+
+    let totalEnergy = 0
+    // Sum all normally, but correct for the one being upgraded
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach((s, idx) => { 
+             if (s) {
+                 if (c === classroom && idx === slotIndex) {
+                     // Adding next level energy instead of current (handled implicitly by summing current + delta, or recalculating)
+                     // Here we sum all current, then subtract current + add next
+                     totalEnergy += CLASSROOM_PCS[s.level - 1].energy
+                 } else {
+                     totalEnergy += CLASSROOM_PCS[s.level - 1].energy
+                 }
+             }
+         })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+
+    // Adjust for upgrade
+    const currentPcEnergy = CLASSROOM_PCS[slot.level - 1].energy
+    totalEnergy = totalEnergy - currentPcEnergy + nextLevelConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    if (totalEnergy > generatorConfig.capacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...classroom.classroomSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+    set({
+      money: money - cost,
+      classrooms: { ...classrooms, [classroomId]: { ...classroom, classroomSlots: newSlots } },
+    })
+  },
+
+  buyNetwork: (classroomId, slotIndex) => {
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      unlockedTechs,
+      coolingSlots,
+      backupSlots
+    } = get()
+
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+    if (classroom.networkSlots[slotIndex]) return
+
+    const networkConfig = NETWORK_EQUIPMENT[0]
+    const cost = networkConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    if (networkConfig.techReq && !unlockedTechs.includes(networkConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${networkConfig.techReq}`)
+      return
+    }
+
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+
+    totalEnergy += networkConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    if (totalEnergy > generatorConfig.capacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...classroom.networkSlots]
+    newSlots[slotIndex] = { level: 1 }
+    set({
+      money: money - cost,
+      classrooms: { ...classrooms, [classroomId]: { ...classroom, networkSlots: newSlots } },
+    })
+  },
+
+  upgradeNetwork: (classroomId, slotIndex) => {
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      unlockedTechs,
+      coolingSlots,
+      backupSlots
+    } = get()
+    
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+    const slot = classroom.networkSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextLevelConfig = NETWORK_EQUIPMENT[slot.level]
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
+      return
+    }
+
+    let totalEnergy = 0
+    // Sum energy
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach((s, idx) => { 
+             if (s) {
+                 totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy
+             }
+         })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+
+    const currentEnergy = NETWORK_EQUIPMENT[slot.level - 1].energy
+    totalEnergy = totalEnergy - currentEnergy + nextLevelConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    if (totalEnergy > generatorConfig.capacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...classroom.networkSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+    set({
+      money: money - cost,
+      classrooms: { ...classrooms, [classroomId]: { ...classroom, networkSlots: newSlots } },
+    })
+  },
+
+  buyTeacher: (classroomId, slotIndex) => {
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      unlockedTechs,
+      coolingSlots,
+      backupSlots
+    } = get()
+
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+    if (classroom.teacherSlots[slotIndex]) return
+
+    const teacherConfig = TEACHERS[0]
+    const cost = teacherConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    if (teacherConfig.techReq && !unlockedTechs.includes(teacherConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${teacherConfig.techReq}`)
+      return
+    }
+
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+
+    totalEnergy += teacherConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    if (totalEnergy > generatorConfig.capacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...classroom.teacherSlots]
+    newSlots[slotIndex] = { level: 1 }
+    set({
+      money: money - cost,
+      classrooms: { ...classrooms, [classroomId]: { ...classroom, teacherSlots: newSlots } },
+    })
+  },
+
+  upgradeTeacher: (classroomId, slotIndex) => {
+    const {
+      money,
+      classrooms,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+      unlockedTechs,
+      coolingSlots,
+      backupSlots
+    } = get()
+    
+    const classroom = classrooms[classroomId]
+    if (!classroom) return
+    const slot = classroom.teacherSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextLevelConfig = TEACHERS[slot.level]
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
+      return
+    }
+
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach((s) => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach((s, idx) => {
+             if (s) {
+                 if (c === classroom && idx === slotIndex) {
+                      // target
+                 } else {
+                     totalEnergy += TEACHERS[s.level - 1].energy
+                 }
+             }
+         })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+
+    const currentEnergy = TEACHERS[slot.level - 1].energy
+    totalEnergy = totalEnergy + nextLevelConfig.energy // (current excluded in loop logic above? No wait, logic above is messy, let's stick to standard pattern: sum all - current + next)
+    
+    // reset totalEnergy for clean calculation
+    totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+    
+    totalEnergy = totalEnergy - currentEnergy + nextLevelConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    if (totalEnergy > generatorConfig.capacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...classroom.teacherSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+    set({
+      money: money - cost,
+      classrooms: { ...classrooms, [classroomId]: { ...classroom, teacherSlots: newSlots } },
+    })
+  },
+
+  buyCooling: (slotIndex) => {
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
+    if (coolingSlots[slotIndex]) return // Already exists
+
+    const initialLevel = 1
+    const config = COOLING_SYSTEMS[initialLevel - 1]
+    const cost = config.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Energy Check
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+    
+    totalEnergy += config.energy
+
+    if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
+       setErrorMessage("Pas assez d'électricité !")
+       return
+    }
+
+    const newSlots = [...coolingSlots]
+    newSlots[slotIndex] = { level: initialLevel }
+
+    set({
+      money: money - cost,
+      coolingSlots: newSlots
+    })
+  },
+
+  upgradeCooling: (slotIndex) => {
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
+    const slot = coolingSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextConfig = COOLING_SYSTEMS[slot.level]
+    const cost = nextConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Energy Check
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach((s, idx) => { 
+        if(s) {
+            if (idx === slotIndex) {
+                 // skip current, we add next later
+            } else {
+                 totalEnergy += COOLING_SYSTEMS[s.level - 1].energy 
+            }
+        }
+    })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+    
+    totalEnergy += nextConfig.energy
+
+    if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
+       setErrorMessage("Pas assez d'électricité !")
+       return
+    }
+
+    const newSlots = [...coolingSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+
+    set({
+      money: money - cost,
+      coolingSlots: newSlots
+    })
+  },
+
+  buyBackup: (slotIndex) => {
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
+    if (backupSlots[slotIndex]) return
+
+    const initialLevel = 1
+    const config = BACKUP_SYSTEMS[initialLevel - 1]
+    const cost = config.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+     // Energy Check
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach(s => { if(s) totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy })
+    
+    totalEnergy += config.energy
+
+    if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
+       setErrorMessage("Pas assez d'électricité !")
+       return
+    }
+
+    const newSlots = [...backupSlots]
+    newSlots[slotIndex] = { level: initialLevel }
+
+    set({
+      money: money - cost,
+      backupSlots: newSlots
+    })
+  },
+
+  upgradeBackup: (slotIndex) => {
+    const { money, coolingSlots, backupSlots, classrooms, generatorLevel, setErrorMessage, globalModifiers } = get()
+    const slot = backupSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextConfig = BACKUP_SYSTEMS[slot.level]
+    const cost = nextConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Energy Check
+    let totalEnergy = 0
+    Object.values(classrooms).forEach(c => {
+         c.classroomSlots.forEach(s => { if (s) totalEnergy += CLASSROOM_PCS[s.level - 1].energy })
+         c.networkSlots.forEach(s => { if (s) totalEnergy += NETWORK_EQUIPMENT[s.level - 1].energy })
+         c.teacherSlots.forEach(s => { if (s) totalEnergy += TEACHERS[s.level - 1].energy })
+    })
+    coolingSlots.forEach(s => { if(s) totalEnergy += COOLING_SYSTEMS[s.level - 1].energy })
+    backupSlots.forEach((s, idx) => { 
+        if(s) {
+            if (idx === slotIndex) {
+                 // skip
+            } else {
+                 totalEnergy += BACKUP_SYSTEMS[s.level - 1].energy 
+            }
+        }
+    })
+    
+    totalEnergy += nextConfig.energy
+
+    if (totalEnergy > GENERATOR_LEVELS[generatorLevel - 1].capacity) {
+       setErrorMessage("Pas assez d'électricité !")
+       return
+    }
+
+    const newSlots = [...backupSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+
+    set({
+      money: money - cost,
+      backupSlots: newSlots
+    })
+  },
+
+  upgradeGym: () => {
+    const { money, gymLevel, globalModifiers, unlockedTechs, setErrorMessage } = get()
+    if (gymLevel >= 10) {
+      setErrorMessage('Salle de sport au maximum.')
+      return
+    }
 
     const nextLevel = GYM_LEVELS[gymLevel]
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money >= cost) {
-      if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
-        setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
-        return
-      }
+    if (money < cost) return
 
-      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
-      const co2Increase = Math.floor(cost * 0.1)
-      const newMaxCo2 = maxCo2 + co2Increase
-
-      set({
-        money: money - cost,
-        gymLevel: gymLevel + 1,
-        maxCo2: newMaxCo2,
-      })
+    if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
+      return
     }
+
+    set({
+      money: money - cost,
+      gymLevel: gymLevel + 1,
+    })
   },
 
   upgradeResearchLab: () => {
-    const { money, researchLabLevel, globalModifiers, maxCo2 } = get()
-    if (researchLabLevel >= 5) return
+    const { money, researchLabLevel, globalModifiers } = get()
+    if (researchLabLevel >= 10) return
 
     const nextLevel = RESEARCH_LAB_LEVELS[researchLabLevel]
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money >= cost) {
-      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
-      const co2Increase = Math.floor(cost * 0.1)
-      const newMaxCo2 = maxCo2 + co2Increase
+    if (money < cost) return
 
-      set({
-        money: money - cost,
-        researchLabLevel: researchLabLevel + 1,
-        maxCo2: newMaxCo2,
-      })
-    }
+    set({
+      money: money - cost,
+      researchLabLevel: researchLabLevel + 1,
+    })
   },
 
-  setGymProfile: (profile) => {
-    set({ gymProfile: profile })
-  },
+  setGymProfile: (profile) => set({ gymProfile: profile }),
 
   performGymActivity: () => {
-    const { money, gymLevel, gymProfile } = get()
+    const { gymProfile, gymLevel } = get()
     if (!gymProfile) return
 
     const activity = GYM_ACTIVITIES[gymProfile.goal as keyof typeof GYM_ACTIVITIES]
     if (!activity) return
 
-    let reward = 100
-    if (gymLevel >= 3) reward += 50
-    if (gymLevel >= 4) reward += activity.product.reward
-
-    set({ money: money + reward })
+    // Simple reward logic for now
+    const reward = 100 * gymLevel
+    set((state) => ({ money: state.money + reward }))
   },
 
   unlockTech: (techId) => {
-    const { research, unlockedTechs, globalModifiers } = get()
+    const { research, unlockedTechs } = get()
     if (unlockedTechs.includes(techId)) return
 
     const tech = TECH_TREE.find((t) => t.id === techId)
     if (!tech) return
 
-    // Check if requirements are met
-    const requirementsMet = tech.reqs.every((reqId) => unlockedTechs.includes(reqId))
-    if (!requirementsMet) return
-
     if (research >= tech.cost) {
-      // Apply effects
-      const newModifiers = { ...globalModifiers }
+      // Check requirements
+      const reqsMet = tech.reqs.every((req) => unlockedTechs.includes(req))
+      if (!reqsMet) return
+
+      // Apply modifiers if any
+      const newModifiers = { ...get().globalModifiers }
       tech.effects.forEach((effect) => {
         if (effect.type === 'CO2_REDUCTION') {
           newModifiers.co2Reduction += Number(effect.value)
@@ -612,28 +1128,28 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   buyServer: (typeId) => {
-    const { money, serverSlots, serverRoomLevel, globalModifiers, unlockedTechs, setErrorMessage } =
-      get()
+    const { money, serverSlots, globalModifiers, setErrorMessage, unlockedTechs } = get()
+    const asset = SERVER_ASSETS[typeId]
+    if (!asset) return
 
-    const emptyIndex = serverSlots.findIndex((s) => s === null)
-    if (emptyIndex === -1) return
+    const emptySlotIndex = serverSlots.findIndex((s) => s === null)
+    if (emptySlotIndex === -1) {
+      setErrorMessage('Plus de place dans la salle serveur !')
+      return
+    }
 
-    const assetConfig = SERVER_ASSETS[typeId]
-    if (!assetConfig) return
 
-    const cost = assetConfig.baseCost * (1 - globalModifiers.costReduction)
+    const cost = asset.baseCost * (1 - globalModifiers.costReduction)
 
-    if (serverRoomLevel < assetConfig.minRoomLevel) return
     if (money < cost) return
 
-    // Tech Check
-    if (assetConfig.techReq && !unlockedTechs.includes(assetConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${assetConfig.techReq}`)
+    if (asset.techReq && !unlockedTechs.includes(asset.techReq)) {
+      setErrorMessage(`Recherche requise : ${asset.techReq}`)
       return
     }
 
     const newSlots = [...serverSlots]
-    newSlots[emptyIndex] = { typeId, grade: 1 }
+    newSlots[emptySlotIndex] = { typeId, grade: 1 }
 
     set({
       money: money - cost,
@@ -646,758 +1162,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     const slot = serverSlots[slotIndex]
     if (!slot) return
 
-    const assetConfig = SERVER_ASSETS[slot.typeId]
-    const nextGrade = slot.grade + 1
-    if (nextGrade > 3) return
+    const asset = SERVER_ASSETS[slot.typeId]
+    const currentGrade = asset.grades.find((g) => g.grade === slot.grade)
+    const nextGrade = asset.grades.find((g) => g.grade === slot.grade + 1)
 
-    const gradeConfig = assetConfig.grades.find((g) => g.grade === nextGrade)
-    if (!gradeConfig) return
+    if (!nextGrade || !currentGrade) return
 
-    const cost = gradeConfig.upgradeCost * (1 - globalModifiers.costReduction)
-
-    if (money >= cost) {
-      const newSlots = [...serverSlots]
-      newSlots[slotIndex] = { ...slot, grade: nextGrade }
-      set({
-        money: money - cost,
-        serverSlots: newSlots,
-      })
-    }
-  },
-
-  buyCooling: (slotIndex) => {
-    const {
-      money,
-      coolingSlots,
-      globalModifiers,
-      generatorLevel,
-      setErrorMessage,
-      serverSlots,
-      classroomSlots,
-      networkSlots,
-      teacherSlots,
-      backupSlots,
-    } = get()
-    if (coolingSlots[slotIndex]) return
-
-    const coolingConfig = COOLING_SYSTEMS[0]
-    const cost = coolingConfig.cost * (1 - globalModifiers.costReduction)
+    const cost = nextGrade.upgradeCost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
 
-    // Calculate energy after purchase
-    let totalEnergy = 0
-
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    coolingSlots.forEach((slot, idx) => {
-      if (slot && idx !== slotIndex) {
-        const cooling = COOLING_SYSTEMS[slot.level - 1]
-        totalEnergy += cooling.energy
-      }
-    })
-
-    backupSlots.forEach((slot) => {
-      if (slot) {
-        const backup = BACKUP_SYSTEMS[slot.level - 1]
-        totalEnergy += backup.energy
-      }
-    })
-
-    totalEnergy += coolingConfig.energy
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...coolingSlots]
-    newSlots[slotIndex] = { level: 1 }
+    const newSlots = [...serverSlots]
+    newSlots[slotIndex] = { ...slot, grade: slot.grade + 1 }
 
     set({
       money: money - cost,
-      coolingSlots: newSlots,
-    })
-  },
-
-  upgradeCooling: (slotIndex) => {
-    const {
-      money,
-      coolingSlots,
-      globalModifiers,
-      generatorLevel,
-      setErrorMessage,
-      classroomSlots,
-      networkSlots,
-      teacherSlots,
-      backupSlots,
-    } = get()
-    const slot = coolingSlots[slotIndex]
-    if (!slot) return
-
-    const nextLevel = slot.level + 1
-    if (nextLevel > 10) return
-
-    const coolingConfig = COOLING_SYSTEMS[nextLevel - 1]
-    const currentCooling = COOLING_SYSTEMS[slot.level - 1]
-    const cost = coolingConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Calculate energy after upgrade
-    let totalEnergy = 0
-
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    coolingSlots.forEach((slot, idx) => {
-      if (slot) {
-        const cooling = idx === slotIndex ? coolingConfig : COOLING_SYSTEMS[slot.level - 1]
-        totalEnergy += cooling.energy
-      }
-    })
-
-    backupSlots.forEach((slot) => {
-      if (slot) {
-        const backup = BACKUP_SYSTEMS[slot.level - 1]
-        totalEnergy += backup.energy
-      }
-    })
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...coolingSlots]
-    newSlots[slotIndex] = { level: nextLevel }
-
-    set({
-      money: money - cost,
-      coolingSlots: newSlots,
-    })
-  },
-
-  buyBackup: (slotIndex) => {
-    const {
-      money,
-      backupSlots,
-      globalModifiers,
-      generatorLevel,
-      setErrorMessage,
-      classroomSlots,
-      networkSlots,
-      teacherSlots,
-      coolingSlots,
-    } = get()
-    if (backupSlots[slotIndex]) return
-
-    const backupConfig = BACKUP_SYSTEMS[0]
-    const cost = backupConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Calculate energy after purchase
-    let totalEnergy = 0
-
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    coolingSlots.forEach((slot) => {
-      if (slot) {
-        const cooling = COOLING_SYSTEMS[slot.level - 1]
-        totalEnergy += cooling.energy
-      }
-    })
-
-    backupSlots.forEach((slot, idx) => {
-      if (slot && idx !== slotIndex) {
-        const backup = BACKUP_SYSTEMS[slot.level - 1]
-        totalEnergy += backup.energy
-      }
-    })
-
-    totalEnergy += backupConfig.energy
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...backupSlots]
-    newSlots[slotIndex] = { level: 1 }
-
-    set({
-      money: money - cost,
-      backupSlots: newSlots,
-    })
-  },
-
-  upgradeBackup: (slotIndex) => {
-    const {
-      money,
-      backupSlots,
-      globalModifiers,
-      generatorLevel,
-      setErrorMessage,
-      classroomSlots,
-      networkSlots,
-      teacherSlots,
-      coolingSlots,
-    } = get()
-    const slot = backupSlots[slotIndex]
-    if (!slot) return
-
-    const nextLevel = slot.level + 1
-    if (nextLevel > 10) return
-
-    const backupConfig = BACKUP_SYSTEMS[nextLevel - 1]
-    const cost = backupConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Calculate energy after upgrade
-    let totalEnergy = 0
-
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    coolingSlots.forEach((slot) => {
-      if (slot) {
-        const cooling = COOLING_SYSTEMS[slot.level - 1]
-        totalEnergy += cooling.energy
-      }
-    })
-
-    backupSlots.forEach((slot, idx) => {
-      if (slot) {
-        const backup = idx === slotIndex ? backupConfig : BACKUP_SYSTEMS[slot.level - 1]
-        totalEnergy += backup.energy
-      }
-    })
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...backupSlots]
-    newSlots[slotIndex] = { level: nextLevel }
-
-    set({
-      money: money - cost,
-      backupSlots: newSlots,
-    })
-  },
-
-  buyClassroomPC: (slotIndex) => {
-    const {
-      money,
-      classroomSlots,
-      networkSlots,
-      teacherSlots, // Added missing teacherSlots
-      globalModifiers,
-      generatorLevel,
-      setErrorMessage,
-      unlockedTechs,
-    } = get()
-    if (classroomSlots[slotIndex]) return
-
-    const pcConfig = CLASSROOM_PCS[0]
-    const cost = pcConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Calculate energy after purchase (PCs + Network + Teachers)
-    let totalEnergy = 0
-
-    // Add energy from existing PCs
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    // Add energy from network
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    // Add energy from teachers
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    // Add energy from new PC
-    totalEnergy += pcConfig.energy
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...classroomSlots]
-    newSlots[slotIndex] = { level: 1 }
-    set({
-      money: money - cost,
-      classroomSlots: newSlots,
-    })
-  },
-
-  upgradeClassroomPC: (slotIndex) => {
-    const {
-      money,
-      classroomSlots,
-      networkSlots,
-      teacherSlots, // Added missing teacherSlots
-      globalModifiers,
-      generatorLevel,
-      setErrorMessage,
-      unlockedTechs,
-    } = get()
-    const slot = classroomSlots[slotIndex]
-    if (!slot) return
-    if (slot.level >= 10) return
-
-    const nextLevelConfig = CLASSROOM_PCS[slot.level]
-    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Tech Check
-    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
-      return
-    }
-
-    // Calculate energy after upgrade (PCs + Network)
-    let totalEnergy = 0
-
-    // Add energy from all PCs (with upgraded one)
-    classroomSlots.forEach((s, idx) => {
-      if (s) {
-        if (idx === slotIndex) {
-          // Use next level energy for this PC
-          totalEnergy += nextLevelConfig.energy
-        } else {
-          const pc = CLASSROOM_PCS[s.level - 1]
-          totalEnergy += pc.energy
-        }
-      }
-    })
-
-    // Add energy from network
-    networkSlots.forEach((s) => {
-      if (s) {
-        const network = NETWORK_EQUIPMENT[s.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    // Add energy from teachers
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...classroomSlots]
-    newSlots[slotIndex] = { level: slot.level + 1 }
-    set({
-      money: money - cost,
-      classroomSlots: newSlots,
-    })
-  },
-
-  buyNetwork: (slotIndex) => {
-    const {
-      money,
-      networkSlots,
-      teacherSlots,
-      globalModifiers,
-      generatorLevel,
-      classroomSlots,
-      setErrorMessage,
-      unlockedTechs,
-    } = get()
-    if (networkSlots[slotIndex]) return
-
-    const networkConfig = NETWORK_EQUIPMENT[0]
-    const cost = networkConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Tech Check
-    if (networkConfig.techReq && !unlockedTechs.includes(networkConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${networkConfig.techReq}`)
-      return
-    }
-
-    // Calculate energy after purchase
-    let totalEnergy = 0
-
-    // Add energy from existing PCs
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    // Add energy from existing network
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    // Add energy from teachers
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    // Add energy from new network equipment
-    totalEnergy += networkConfig.energy
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...networkSlots]
-    newSlots[slotIndex] = { level: 1 }
-    set({
-      money: money - cost,
-      networkSlots: newSlots,
-    })
-  },
-
-  upgradeNetwork: (slotIndex) => {
-    const {
-      money,
-      networkSlots,
-      teacherSlots,
-      globalModifiers,
-      generatorLevel,
-      classroomSlots,
-      setErrorMessage,
-      unlockedTechs,
-    } = get()
-    const slot = networkSlots[slotIndex]
-    if (!slot) return
-    if (slot.level >= 10) return
-
-    const nextLevelConfig = NETWORK_EQUIPMENT[slot.level]
-    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Tech Check
-    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
-      return
-    }
-
-    // Calculate energy after upgrade
-    let totalEnergy = 0
-
-    // Add energy from PCs
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    // Add energy from all network (with upgraded one)
-    networkSlots.forEach((s, idx) => {
-      if (s) {
-        if (idx === slotIndex) {
-          // Use next level energy for this network
-          totalEnergy += nextLevelConfig.energy
-        } else {
-          const network = NETWORK_EQUIPMENT[s.level - 1]
-          totalEnergy += network.energy
-        }
-      }
-    })
-
-    // Add energy from teachers
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...networkSlots]
-    newSlots[slotIndex] = { level: slot.level + 1 }
-    set({
-      money: money - cost,
-      networkSlots: newSlots,
-    })
-  },
-
-  buyTeacher: (slotIndex) => {
-    const {
-      money,
-      teacherSlots,
-      globalModifiers,
-      generatorLevel,
-      classroomSlots,
-      networkSlots,
-      setErrorMessage,
-      unlockedTechs,
-    } = get()
-    if (teacherSlots[slotIndex]) return
-
-    const teacherConfig = TEACHERS[0]
-    const cost = teacherConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Tech Check
-    if (teacherConfig.techReq && !unlockedTechs.includes(teacherConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${teacherConfig.techReq}`)
-      return
-    }
-
-    // Calculate energy after purchase
-    let totalEnergy = 0
-
-    // Add energy from existing PCs
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    // Add energy from existing network
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    // Add energy from existing teachers
-    teacherSlots.forEach((slot) => {
-      if (slot) {
-        const teacher = TEACHERS[slot.level - 1]
-        totalEnergy += teacher.energy
-      }
-    })
-
-    // Add energy from new teacher
-    totalEnergy += teacherConfig.energy
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...teacherSlots]
-    newSlots[slotIndex] = { level: 1 }
-    set({
-      money: money - cost,
-      teacherSlots: newSlots,
-    })
-  },
-
-  upgradeTeacher: (slotIndex) => {
-    const {
-      money,
-      teacherSlots,
-      globalModifiers,
-      generatorLevel,
-      classroomSlots,
-      networkSlots,
-      setErrorMessage,
-      unlockedTechs,
-    } = get()
-    const slot = teacherSlots[slotIndex]
-    if (!slot) return
-    if (slot.level >= 10) return
-
-    const nextLevelConfig = TEACHERS[slot.level]
-    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
-
-    if (money < cost) return
-
-    // Tech Check
-    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
-      return
-    }
-
-    // Calculate energy after upgrade
-    let totalEnergy = 0
-
-    // Add energy from PCs
-    classroomSlots.forEach((slot) => {
-      if (slot) {
-        const pc = CLASSROOM_PCS[slot.level - 1]
-        totalEnergy += pc.energy
-      }
-    })
-
-    // Add energy from network
-    networkSlots.forEach((slot) => {
-      if (slot) {
-        const network = NETWORK_EQUIPMENT[slot.level - 1]
-        totalEnergy += network.energy
-      }
-    })
-
-    // Add energy from all teachers (with upgraded one)
-    teacherSlots.forEach((s, idx) => {
-      if (s) {
-        if (idx === slotIndex) {
-          // Use next level energy for this teacher
-          totalEnergy += nextLevelConfig.energy
-        } else {
-          const teacher = TEACHERS[s.level - 1]
-          totalEnergy += teacher.energy
-        }
-      }
-    })
-
-    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
-    const currentCapacity = generatorConfig.capacity
-
-    if (totalEnergy > currentCapacity) {
-      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
-      return
-    }
-
-    const newSlots = [...teacherSlots]
-    newSlots[slotIndex] = { level: slot.level + 1 }
-    set({
-      money: money - cost,
-      teacherSlots: newSlots,
+      serverSlots: newSlots,
     })
   },
 
@@ -1427,38 +1207,43 @@ export const useGameStore = create<GameState>((set, get) => ({
       let classroomCo2 = 0
       let visualStudents = 0
 
-      state.classroomSlots.forEach((slot) => {
-        if (slot) {
-          const pc = CLASSROOM_PCS[slot.level - 1]
-          classroomIncome += pc.income
-          classroomEnergy += pc.energy
-          classroomCo2 += pc.co2
-          visualStudents++
-        }
-      })
-
       // Network Equipment Income & Energy
       let networkIncome = 0
       let networkEnergy = 0
-
-      state.networkSlots.forEach((slot) => {
-        if (slot) {
-          const network = NETWORK_EQUIPMENT[slot.level - 1]
-          networkIncome += network.income
-          networkEnergy += network.energy
-        }
-      })
 
       // Teachers Income & Energy
       let teacherIncome = 0
       let teacherEnergy = 0
 
-      state.teacherSlots.forEach((slot) => {
-        if (slot) {
-          const teacher = TEACHERS[slot.level - 1]
-          teacherIncome += teacher.income
-          teacherEnergy += teacher.energy
-        }
+      Object.values(state.classrooms).forEach(classroom => {
+          // PCs
+          classroom.classroomSlots.forEach(slot => {
+            if (slot) {
+              const pc = CLASSROOM_PCS[slot.level - 1]
+              classroomIncome += pc.income
+              classroomEnergy += pc.energy
+              classroomCo2 += pc.co2
+              visualStudents++
+            }
+          })
+
+          // Network
+          classroom.networkSlots.forEach(slot => {
+            if (slot) {
+              const network = NETWORK_EQUIPMENT[slot.level - 1]
+              networkIncome += network.income
+              networkEnergy += network.energy
+            }
+          })
+          
+          // Teachers
+          classroom.teacherSlots.forEach(slot => {
+            if (slot) {
+              const teacher = TEACHERS[slot.level - 1]
+              teacherIncome += teacher.income
+              teacherEnergy += teacher.energy
+            }
+          })
       })
 
       // Cooling Systems Income & Energy & CO2
