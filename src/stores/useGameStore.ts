@@ -981,7 +981,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       teacherSlots,
       globalModifiers,
       generatorLevel,
-      teacherSlots, // Added missing destructuring
       setErrorMessage,
       unlockedTechs,
     } = get()
@@ -992,19 +991,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (money < cost) return
 
-    // Tech Check
-    if (pcConfig.techReq && !unlockedTechs.includes(pcConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${pcConfig.techReq}`)
-      return
-    }
-
-    // Tech Check
-    if (pcConfig.techReq && !unlockedTechs.includes(pcConfig.techReq)) {
-      setErrorMessage(`Recherche requise : ${pcConfig.techReq}`)
-      return
-    }
-
-    // Calculate energy after purchase (PCs + Network)
+    // Calculate energy after purchase (PCs + Network + Teachers)
     let totalEnergy = 0
 
     // Add energy from existing PCs
