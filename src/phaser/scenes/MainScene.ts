@@ -2,12 +2,15 @@ import Phaser from 'phaser';
 import { useGameStore } from '../../stores/useGameStore';
 import { ROOMS } from '../../config/gameConfig';
 import tilesetImg from '../../assets/CoolSchool_tileset.png';
+import student1Img from '../../assets/StudentModels/New_Piskel-1.png.png';
+import student2Img from '../../assets/StudentModels/New_Piskel-2.png.png';
+import student3Img from '../../assets/StudentModels/New_Piskel-3.png.png';
 import levelJsonUrl from '../../assets/poules.json?url';
 
 export class MainScene extends Phaser.Scene {
   private gridSize = 48;
   private unsubscribe: () => void;
-  private students: Phaser.GameObjects.Text[] = [];
+  private students: Phaser.GameObjects.Sprite[] = [];
 
   constructor() {
     super('MainScene');
@@ -16,6 +19,9 @@ export class MainScene extends Phaser.Scene {
 
   preload() {
     this.load.image('tiles', tilesetImg);
+    this.load.image('student1', student1Img);
+    this.load.image('student2', student2Img);
+    this.load.image('student3', student3Img);
     this.load.tilemapTiledJSON('map', levelJsonUrl);
   }
 
@@ -36,8 +42,6 @@ export class MainScene extends Phaser.Scene {
     const mapHeight = map.heightInPixels;
     this.cameras.main.centerOn(mapWidth / 2, mapHeight / 2);
     this.cameras.main.setZoom(0.5);
-
-    // this.drawGrid(); // Grid is less useful with the full map art, disabling for now or keeping it subtle
 
     // Subscribe to store changes
     this.unsubscribe = useGameStore.subscribe((state) => {
@@ -100,22 +104,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   drawGrid() {
-    const graphics = this.add.graphics();
-    graphics.lineStyle(1, 0x2d3748, 0.5);
-
-    const width = 4000;
-    const height = 4000;
-
-    for (let x = 0; x < width; x += this.gridSize) {
-      graphics.moveTo(x, 0);
-      graphics.lineTo(x, height);
-    }
-
-    for (let y = 0; y < height; y += this.gridSize) {
-      graphics.moveTo(0, y);
-      graphics.lineTo(width, y);
-    }
-    graphics.strokePath();
+     // Removed grid logic
   }
 
   renderRooms(rooms: any[]) {
@@ -181,9 +170,13 @@ export class MainScene extends Phaser.Scene {
     if (this.students.length < visualCount) {
         const toAdd = visualCount - this.students.length;
         for (let i = 0; i < toAdd; i++) {
-            const student = this.add.text(0, 0, '🎓', { fontSize: '16px' });
-            student.x = Phaser.Math.Between(0, this.scale.width);
-            student.y = Phaser.Math.Between(0, this.scale.height);
+            // Pick random student texture
+            const textureKey = Phaser.Utils.Array.GetRandom(['student1', 'student2', 'student3']);
+            const student = this.add.sprite(0, 0, textureKey);
+            
+            student.x = Phaser.Math.Between(0, this.scale.width); 
+            student.setDepth(10); // Above rooms
+
             this.students.push(student);
         }
     } else if (this.students.length > visualCount) {
