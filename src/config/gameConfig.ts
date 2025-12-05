@@ -13,6 +13,8 @@ export interface GeneratorLevel {
   name: string
   cost: number
   capacity: number
+  co2: number
+  techReq: string | null
   description: string
 }
 
@@ -22,6 +24,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Raccordement Domestique',
     cost: 0,
     capacity: 30,
+    co2: 5,
+    techReq: null,
     description: 'Compteur électrique standard',
   },
   {
@@ -29,6 +33,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Groupe Électrogène Diesel',
     cost: 800,
     capacity: 60,
+    co2: 25,
+    techReq: null,
     description: 'Générateur bruyant qui fume',
   },
   {
@@ -36,6 +42,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Panneaux Solaires Toit',
     cost: 2000,
     capacity: 100,
+    co2: 0,
+    techReq: 'G_SOLAR',
     description: 'Quelques panneaux bleus',
   },
   {
@@ -43,6 +51,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Éolienne Individuelle',
     cost: 5000,
     capacity: 150,
+    co2: 0,
+    techReq: 'G_WIND',
     description: 'Une éolienne qui tourne',
   },
   {
@@ -50,6 +60,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Transformateur Industriel',
     cost: 10000,
     capacity: 220,
+    co2: 10,
+    techReq: null,
     description: 'Gros boitier gris Haute Tension',
   },
   {
@@ -57,6 +69,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Champ Solaire',
     cost: 25000,
     capacity: 350,
+    co2: 0,
+    techReq: 'G_SOLAR_FARM',
     description: 'Le toit est couvert de panneaux',
   },
   {
@@ -64,6 +78,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Barrage Hydro (Contrat)',
     cost: 60000,
     capacity: 500,
+    co2: 2,
+    techReq: 'G_HYDRO',
     description: 'Câbles énormes arrivant au bâtiment',
   },
   {
@@ -71,6 +87,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Réacteur Biomasse',
     cost: 120000,
     capacity: 700,
+    co2: 15,
+    techReq: 'G_BIO',
     description: 'Cuves vertes connectées',
   },
   {
@@ -78,6 +96,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Mini-Réacteur Nucléaire',
     cost: 300000,
     capacity: 1000,
+    co2: 1,
+    techReq: 'G_NUCLEAR',
     description: 'Cylindre brillant futuriste',
   },
   {
@@ -85,6 +105,8 @@ export const GENERATOR_LEVELS: GeneratorLevel[] = [
     name: 'Fusion Froide (ARC)',
     cost: 1000000,
     capacity: 2000,
+    co2: 0,
+    techReq: 'G_FUSION',
     description: "Anneau d'énergie pure",
   },
 ]
@@ -446,6 +468,78 @@ export const TECH_TREE: TechNode[] = [
     effects: [{ type: 'UNLOCK_FEATURE', value: 'pc_7', target: 'classroom' }],
     reqs: ['C5', 'C6'],
     position: { x: 5, y: 3 },
+  },
+
+  // --- GENERATOR / ECOLOGY [Cols 8-9] ---
+  {
+    id: 'G_SOLAR',
+    name: 'Énergie Solaire',
+    cost: 5000,
+    description: 'Débloque les Panneaux Solaires (Toit) - 0 CO2',
+    category: 'ECOLOGY',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_3', target: 'generator' }],
+    reqs: [],
+    position: { x: 8, y: 0 },
+  },
+  {
+    id: 'G_WIND',
+    name: 'Énergie Éolienne',
+    cost: 15000,
+    description: 'Débloque l\'Éolienne Individuelle - 0 CO2',
+    category: 'ECOLOGY',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_4', target: 'generator' }],
+    reqs: ['G_SOLAR'],
+    position: { x: 8, y: 1 },
+  },
+  {
+    id: 'G_SOLAR_FARM',
+    name: 'Ferme Solaire',
+    cost: 50000,
+    description: 'Débloque le Champ Solaire - 0 CO2',
+    category: 'ECOLOGY',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_6', target: 'generator' }],
+    reqs: ['G_WIND'],
+    position: { x: 8, y: 2 },
+  },
+  {
+    id: 'G_HYDRO',
+    name: 'Hydroélectricité',
+    cost: 100000,
+    description: 'Débloque le Barrage Hydro - Faible CO2',
+    category: 'ECOLOGY',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_7', target: 'generator' }],
+    reqs: ['G_SOLAR_FARM'],
+    position: { x: 8, y: 3 },
+  },
+  {
+    id: 'G_BIO',
+    name: 'Biomasse',
+    cost: 200000,
+    description: 'Débloque le Réacteur Biomasse - CO2 Moyen',
+    category: 'ECOLOGY',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_8', target: 'generator' }],
+    reqs: ['G_HYDRO'],
+    position: { x: 9, y: 3 }, // Side branch?
+  },
+  {
+    id: 'G_NUCLEAR',
+    name: 'Énergie Nucléaire',
+    cost: 500000,
+    description: 'Débloque le Mini-Réacteur - Très Faible CO2',
+    category: 'INFRA',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_9', target: 'generator' }],
+    reqs: ['G_HYDRO'],
+    position: { x: 8, y: 4 },
+  },
+  {
+    id: 'G_FUSION',
+    name: 'Fusion Froide',
+    cost: 2000000,
+    description: 'Débloque l\'ARC Reactor - 0 CO2',
+    category: 'INFRA',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'generator_10', target: 'generator' }],
+    reqs: ['G_NUCLEAR'],
+    position: { x: 8, y: 5 },
   },
   {
     id: 'C8',
@@ -1015,4 +1109,7 @@ export const DEFAULT_MAP = [
   { id: 'classroom-1', type: 'classroom', x1: 24, y1: 51, x2: 35, y2: 64, unlocked: true, cost: 0 },
   { id: 'classroom-2', type: 'classroom', x1: 60, y1: 51, x2: 71, y2: 64, unlocked: false, cost: 5000 },
   { id: 'classroom-3', type: 'classroom', x1: 76, y1: 51, x2: 87, y2: 64, unlocked: false, cost: 15000 },
+
+  // Generator
+  { id: 'generator-main', type: 'generator', x1: 19, y1: 30, x2: 26, y2: 39, unlocked: true, cost: 0 },
 ]

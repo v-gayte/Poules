@@ -249,19 +249,25 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeGenerator: () => {
-    const { money, generatorLevel, globalModifiers } = get()
+    const { money, generatorLevel, unlockedTechs, globalModifiers, setErrorMessage } = get()
     if (generatorLevel >= 10) return
 
     const nextLevel = GENERATOR_LEVELS[generatorLevel]
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money >= cost) {
-      set({
-        money: money - cost,
-        generatorLevel: generatorLevel + 1,
-        energyCapacity: nextLevel.capacity,
-      })
+    if (money < cost) return
+
+    // Check tech requirement
+    if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
+      return
     }
+
+    set({
+      money: money - cost,
+      generatorLevel: generatorLevel + 1,
+      energyCapacity: nextLevel.capacity,
+    })
   },
 
   upgradeServerRoom: () => {
@@ -1274,8 +1280,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       })
 
+      // 5. Total CO2 (Servers + Classrooms + Cooling + Backup + Generator)
+      const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
+      
       // Add classroom CO2 to total
-      totalCo2 += classroomCo2 + coolingCo2 + backupCo2
+      totalCo2 += classroomCo2 + coolingCo2 + backupCo2 + generatorConfig.co2
 
       // Apply CO2 Reduction from Techs (after adding all sources)
       const currentCo2 = totalCo2 * (1 - state.globalModifiers.co2Reduction)
@@ -1290,7 +1299,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       const currentEnergyUsage =
         classroomEnergy + networkEnergy + teacherEnergy + coolingEnergy + backupEnergy
 
-      const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
       const currentCapacity = generatorConfig.capacity
 
       const isPowered = currentCapacity >= currentEnergyUsage
@@ -1308,7 +1316,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         tick: state.tick + 1,
         money: state.money + finalIncome,
         research: state.research + (isPowered ? researchIncome : 0),
-        co2: currentCo2, // Current CO2 level (not accumulated, like energy)
+        co2: Math.min(state.maxCo2, state.co2 + currentCo2), // Accumulate CO2
         energyCapacity: currentCapacity,
         energyUsage: currentEnergyUsage,
         studentCount: visualStudents,
