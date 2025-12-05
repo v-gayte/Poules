@@ -6,6 +6,7 @@ import {
   SERVER_ASSETS, 
   TECH_TREE,
   CLASSROOM_LEVELS,
+  CLASSROOM_PCS,
   GYM_LEVELS,
   GYM_QUESTIONS,
   GYM_ACTIVITIES
@@ -72,41 +73,74 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string, onClose: () =
     const nextConfig = CLASSROOM_LEVELS[level];
 
     return (
-      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-64">
-        <div className="flex-1">
+      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-80 overflow-hidden">
+        {/* LEFT: Room Stats */}
+        <div className="w-1/3 border-r border-gray-700 pr-6">
           <h2 className="text-2xl font-bold text-yellow-400 mb-2">{config.name} (Lvl {level})</h2>
-          <p className="text-gray-400 mb-4">Where students learn and pay tuition.</p>
+          <p className="text-gray-400 mb-4">Manage your student PCs.</p>
           
-          <div className="flex items-center gap-4 mb-4">
-            <div className="bg-gray-900 p-4 rounded border border-gray-600">
-              <div className="text-sm text-gray-500">Students</div>
-              <div className="text-3xl font-bold text-white">{config.capacity} 🎓</div>
-              <div className="text-xs text-green-400">+${config.capacity * config.tuition}/t</div>
-            </div>
-            {nextConfig && (
-               <div className="text-gray-500">➜</div>
-            )}
-            {nextConfig && (
-                <div className="bg-gray-900 p-4 rounded border border-gray-600 opacity-75">
-                  <div className="text-sm text-gray-500">Next Level</div>
-                  <div className="text-xl font-bold text-white">{nextConfig.capacity} 🎓</div>
-                  <div className="text-xs text-green-400">+${nextConfig.capacity * nextConfig.tuition}/t</div>
-                </div>
-            )}
+          <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+              <div className="text-sm text-gray-500">Capacity</div>
+              <div className="text-3xl font-bold text-white">{config.capacity} Slots</div>
           </div>
 
           {nextConfig ? (
             <button 
                 onClick={store.upgradeClassroom}
                 disabled={store.money < nextConfig.cost}
-                className="px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
+                className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
             >
-                Expand Classroom (${nextConfig.cost.toLocaleString()})
+                Expand Room (${nextConfig.cost.toLocaleString()})
             </button>
           ) : (
             <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
           )}
         </div>
+
+        {/* RIGHT: PC Slots */}
+        <div className="flex-1 overflow-y-auto">
+            <h3 className="font-bold text-gray-300 mb-4 sticky top-0 bg-gray-800 pb-2">Student PCs ({store.classroomSlots.filter(s => s).length}/{config.capacity})</h3>
+            <div className="grid grid-cols-5 gap-3">
+                {store.classroomSlots.map((slot, index) => {
+                    if (slot) {
+                        const pc = CLASSROOM_PCS[slot.level - 1];
+                        const nextPc = CLASSROOM_PCS[slot.level];
+
+                        return (
+                            <div key={index} className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center">
+                                <div className="text-2xl mb-1">{pc.icon}</div>
+                                <div className="font-bold text-xs text-white truncate">{pc.name}</div>
+                                <div className="text-[10px] text-green-400">+${pc.income}/s</div>
+                                <div className="text-[10px] text-yellow-400">-{pc.energy}⚡</div>
+                                
+                                {nextPc && (
+                                    <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1">
+                                        <div className="text-[10px] text-gray-300 mb-1">Upgrade to {nextPc.name}</div>
+                                        <button 
+                                            onClick={() => store.upgradeClassroomPC(index)}
+                                            disabled={store.money < nextPc.cost}
+                                            className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
+                                        >
+                                            ${nextPc.cost}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    } else {
+                        const basePc = CLASSROOM_PCS[0];
+                        return (
+                            <div key={index} className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800" onClick={() => store.buyClassroomPC(index)}>
+                                <span className="text-xs text-gray-500">Empty</span>
+                                <div className="text-xs text-green-400 font-bold">+ Buy</div>
+                                <div className="text-[10px] text-gray-400">${basePc.cost}</div>
+                            </div>
+                        );
+                    }
+                })}
+            </div>
+        </div>
+
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">✕</button>
       </div>
     );

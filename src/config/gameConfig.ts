@@ -130,19 +130,40 @@ export interface ClassroomLevel {
     level: number;
     name: string;
     cost: number;
-    capacity: number; 
-    tuition: number; 
+    capacity: number; // Slots for PCs
 }
 
 export const CLASSROOM_LEVELS: ClassroomLevel[] = [
-    { level: 1, name: 'Salle de TD', cost: 0, capacity: 10, tuition: 5 },
-    { level: 2, name: 'Amphi 101', cost: 2000, capacity: 25, tuition: 8 },
-    { level: 3, name: 'Grand Amphi', cost: 5000, capacity: 50, tuition: 12 },
-    { level: 4, name: 'Campus Numérique', cost: 15000, capacity: 100, tuition: 20 },
-    { level: 5, name: 'Université Tech', cost: 50000, capacity: 200, tuition: 35 },
+    { level: 1, name: 'Salle de TD', cost: 0, capacity: 5 },
+    { level: 2, name: 'Amphi 101', cost: 2000, capacity: 10 },
+    { level: 3, name: 'Grand Amphi', cost: 5000, capacity: 20 },
+    { level: 4, name: 'Campus Numérique', cost: 15000, capacity: 40 },
+    { level: 5, name: 'Université Tech', cost: 50000, capacity: 80 },
 ];
 
-// --- 6. GYM (New) ---
+export interface ClassroomPC {
+    level: number;
+    name: string;
+    cost: number;
+    energy: number;
+    income: number;
+    icon: string;
+}
+
+export const CLASSROOM_PCS: ClassroomPC[] = [
+    { level: 1, name: 'PC Patate', cost: 100, energy: 1, income: 5, icon: '🥔' },
+    { level: 2, name: 'PC Bureautique', cost: 180, energy: 2, income: 10, icon: '🖥️' },
+    { level: 3, name: 'Laptop Étudiant', cost: 325, energy: 3, income: 20, icon: '💻' },
+    { level: 4, name: 'Tour Gamer', cost: 600, energy: 4, income: 40, icon: '🕹️' },
+    { level: 5, name: 'Station de Montage', cost: 1100, energy: 5, income: 80, icon: '🎬' },
+    { level: 6, name: 'Serveur Rack', cost: 2000, energy: 6, income: 160, icon: '📼' },
+    { level: 7, name: 'Mining Rig', cost: 3600, energy: 7, income: 320, icon: '⛏️' },
+    { level: 8, name: 'Supercalculateur', cost: 6500, energy: 8, income: 640, icon: '🗄️' },
+    { level: 9, name: 'Ordinateur Quantique', cost: 12000, energy: 9, income: 1280, icon: '🔮' },
+    { level: 10, name: 'I.A. Suprême', cost: 22000, energy: 10, income: 2560, icon: '🧠' },
+];
+
+// --- 6. GYM ---
 export interface GymLevel {
     level: number;
     name: string;
@@ -166,17 +187,17 @@ export const GYM_ACTIVITIES = {
     'Perte de poids': {
         text: 'Faites 30 minutes de cardio intense.',
         visual: '🏃',
-        product: { name: 'Chaussures Running Kalenji', link: 'https://www.decathlon.fr', reward: 500 }
+        product: { name: 'Chaussures Running Kalenji', link: 'https://www.decathlon.fr/p/chaussures-de-running-femme-kiprun-cushion-500-beige-rose/_/R-p-353287?mc=8914009&c=gris_blanc_bleu', reward: 500 }
     },
     'Prise de masse': {
         text: 'Soulevez des poids lourds (5x5).',
         visual: '🏋️',
-        product: { name: 'Banc de Musculation Domyos', link: 'https://www.decathlon.fr', reward: 500 }
+        product: { name: 'Banc de Musculation Domyos', link: 'https://www.decathlon.fr/p/mp/citysports/banc-de-musculation-citysports-7-positions-ajustables-et-2-sangles/_/R-p-3b308d5d-4d91-4929-8388-33660b3b98e1?mc=3b308d5d-4d91-4929-8388-33660b3b98e1_c1c14&c=noir_rouge', reward: 500 }
     },
     'Endurance': {
         text: 'Courez 10km à rythme modéré.',
         visual: '🚴',
-        product: { name: 'Vélo Elliptique', link: 'https://www.decathlon.fr', reward: 500 }
+        product: { name: 'Vélo Elliptique', link: 'https://www.decathlon.fr/p/velo-cargo-electrique-longtail-chargement-arriere-r500e-vert-clair/_/R-p-349924?mc=8826512&c=vert', reward: 500 }
     }
 };
 
