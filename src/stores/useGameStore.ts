@@ -7,6 +7,8 @@ import {
   TECH_TREE,
   CLASSROOM_LEVELS,
   CLASSROOM_PCS,
+  NETWORK_EQUIPMENT,
+  TEACHERS,
   GYM_LEVELS,
   GYM_ACTIVITIES,
   RESEARCH_LAB_LEVELS,
@@ -19,6 +21,14 @@ interface ServerSlot {
 }
 
 interface ClassroomPCSlot {
+  level: number // 1-10
+}
+
+interface NetworkSlot {
+  level: number // 1-10
+}
+
+interface TeacherSlot {
   level: number // 1-10
 }
 
@@ -60,6 +70,8 @@ interface GameState {
 
   serverSlots: (ServerSlot | null)[]
   classroomSlots: (ClassroomPCSlot | null)[]
+  networkSlots: (NetworkSlot | null)[]
+  teacherSlots: (TeacherSlot | null)[]
 
   // Gym
   gymProfile: GymProfile | null
@@ -99,6 +111,12 @@ interface GameState {
   buyClassroomPC: (slotIndex: number) => void
   upgradeClassroomPC: (slotIndex: number) => void
 
+  buyNetwork: (slotIndex: number) => void
+  upgradeNetwork: (slotIndex: number) => void
+
+  buyTeacher: (slotIndex: number) => void
+  upgradeTeacher: (slotIndex: number) => void
+
   tickUpdate: () => void
 }
 
@@ -120,10 +138,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   serverSlots: [null, null],
   classroomSlots: (() => {
-    const slots = new Array(CLASSROOM_LEVELS[0].capacity).fill(null)
+    const slots = new Array(8).fill(null) // Fixed capacity of 8 PCs
     slots[0] = { level: 1 } // Start with 1 PC
     return slots
   })(),
+  networkSlots: [], // Max 4 network equipment
+  teacherSlots: [], // Max 4 teachers
 
   gymProfile: null,
 
@@ -142,7 +162,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setErrorMessage: (message) => set({ errorMessage: message }),
 
   unlockRoom: (id) => {
-    const { money, rooms } = get()
+    const { money, rooms, maxCo2 } = get()
     const roomIndex = rooms.findIndex((r) => r.id === id)
     if (roomIndex === -1) return
 
@@ -152,10 +172,16 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (money >= room.cost) {
       const newRooms = [...rooms]
       newRooms[roomIndex] = { ...room, unlocked: true }
+
+      // Increase CO2 capacity proportionally to room cost (10% of cost as additional capacity)
+      const co2Increase = Math.floor(room.cost * 0.1)
+      const newMaxCo2 = maxCo2 + co2Increase
+
       set({
         money: money - room.cost,
         rooms: newRooms,
         inspectedRoomId: id,
+        maxCo2: newMaxCo2,
       })
     }
   },
@@ -225,37 +251,143 @@ export const useGameStore = create<GameState>((set, get) => ({
       newSlots[i] = currentSlots[i]
     }
 
+    // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
+    const { maxCo2 } = get()
+    const co2Increase = Math.floor(cost * 0.1)
+    const newMaxCo2 = maxCo2 + co2Increase
+
     set({
       money: money - cost,
       serverRoomLevel: serverRoomLevel + 1,
       serverSlots: newSlots,
+      maxCo2: newMaxCo2,
     })
   },
 
   upgradeClassroom: () => {
-    const { money, classroomLevel, classroomSlots, globalModifiers } = get()
-    if (classroomLevel >= 5) return
+    const {
+      money,
+      classroomLevel,
+      networkSlots,
+      teacherSlots,
+      globalModifiers,
+      generatorLevel,
+      setErrorMessage,
+    } = get()
 
-    const nextLevel = CLASSROOM_LEVELS[classroomLevel]
-    const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
+    // Level 1: Add first network slot (unlocks network section)
+    if (classroomLevel === 1 && networkSlots.length === 0) {
+      const nextLevel = CLASSROOM_LEVELS[classroomLevel]
+      const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
-    if (money >= cost) {
-      // Resize slots
-      const newSlots = new Array(nextLevel.capacity).fill(null)
-      for (let i = 0; i < classroomSlots.length; i++) {
-        newSlots[i] = classroomSlots[i]
+      if (money < cost) return
+
+      // Add the first network slot
+      const newNetworkSlots = [null]
+
+      // Check energy for the new network slot
+      const baseNetwork = NETWORK_EQUIPMENT[0]
+      let totalEnergy = 0
+
+      // Calculate current energy from PCs
+      const { classroomSlots } = get()
+      classroomSlots.forEach((slot) => {
+        if (slot) {
+          const pc = CLASSROOM_PCS[slot.level - 1]
+          totalEnergy += pc.energy
+        }
+      })
+
+      // Add energy from potential new network equipment
+      totalEnergy += baseNetwork.energy
+
+      const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+      const currentCapacity = generatorConfig.capacity
+
+      if (totalEnergy > currentCapacity) {
+        setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+        return
       }
+
+      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
+      const { maxCo2 } = get()
+      const co2Increase = Math.floor(cost * 0.1)
+      const newMaxCo2 = maxCo2 + co2Increase
 
       set({
         money: money - cost,
         classroomLevel: classroomLevel + 1,
-        classroomSlots: newSlots,
+        networkSlots: newNetworkSlots,
+        maxCo2: newMaxCo2,
       })
+      return
+    }
+
+    // Level 2-5: Add teacher slots (unlocks teacher section) - only if network slot exists and less than 3 teachers
+    if (classroomLevel >= 2 && networkSlots.length > 0 && teacherSlots.length < 3) {
+      // Use the cost of the current level for adding teacher slot
+      const currentLevel = CLASSROOM_LEVELS[classroomLevel - 1]
+      const cost = currentLevel.cost * (1 - globalModifiers.costReduction)
+
+      if (money < cost) return
+
+      // Add a new teacher slot
+      const newTeacherSlots = [...teacherSlots, null]
+
+      // Check energy for the new teacher slot
+      const baseTeacher = TEACHERS[0]
+      let totalEnergy = 0
+
+      // Calculate current energy from PCs
+      const { classroomSlots } = get()
+      classroomSlots.forEach((slot) => {
+        if (slot) {
+          const pc = CLASSROOM_PCS[slot.level - 1]
+          totalEnergy += pc.energy
+        }
+      })
+
+      // Calculate current energy from network
+      networkSlots.forEach((slot) => {
+        if (slot) {
+          const network = NETWORK_EQUIPMENT[slot.level - 1]
+          totalEnergy += network.energy
+        }
+      })
+
+      // Add energy from potential new teacher
+      totalEnergy += baseTeacher.energy
+
+      const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+      const currentCapacity = generatorConfig.capacity
+
+      if (totalEnergy > currentCapacity) {
+        setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+        return
+      }
+
+      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
+      const { maxCo2 } = get()
+      const co2Increase = Math.floor(cost * 0.1)
+      const newMaxCo2 = maxCo2 + co2Increase
+
+      set({
+        money: money - cost,
+        teacherSlots: newTeacherSlots,
+        maxCo2: newMaxCo2,
+      })
+      return
+    }
+
+    // If we have network slot and 3 teachers, classroom is maxed
+    if (networkSlots.length > 0 && teacherSlots.length >= 3) {
+      setErrorMessage('La salle est au maximum.')
+      return
     }
   },
 
   upgradeGym: () => {
-    const { money, gymLevel, gymProfile, globalModifiers } = get()
+    const { money, gymLevel, gymProfile, globalModifiers, maxCo2 } = get()
     if (gymLevel >= 4) return
 
     if (gymLevel === 1 && !gymProfile) return
@@ -264,24 +396,34 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
     if (money >= cost) {
+      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
+      const co2Increase = Math.floor(cost * 0.1)
+      const newMaxCo2 = maxCo2 + co2Increase
+
       set({
         money: money - cost,
         gymLevel: gymLevel + 1,
+        maxCo2: newMaxCo2,
       })
     }
   },
 
   upgradeResearchLab: () => {
-    const { money, researchLabLevel, globalModifiers } = get()
+    const { money, researchLabLevel, globalModifiers, maxCo2 } = get()
     if (researchLabLevel >= 5) return
 
     const nextLevel = RESEARCH_LAB_LEVELS[researchLabLevel]
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
     if (money >= cost) {
+      // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
+      const co2Increase = Math.floor(cost * 0.1)
+      const newMaxCo2 = maxCo2 + co2Increase
+
       set({
         money: money - cost,
         researchLabLevel: researchLabLevel + 1,
+        maxCo2: newMaxCo2,
       })
     }
   },
@@ -381,6 +523,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const {
       money,
       classroomSlots,
+      networkSlots,
       globalModifiers,
       serverRoomLevel,
       generatorLevel,
@@ -393,7 +536,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (money < cost) return
 
-    // Calculate energy after purchase (only PCs count)
+    // Calculate energy after purchase (PCs + Network)
     let totalEnergy = 0
 
     // Add energy from existing PCs
@@ -401,6 +544,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (slot) {
         const pc = CLASSROOM_PCS[slot.level - 1]
         totalEnergy += pc.energy
+      }
+    })
+
+    // Add energy from network
+    networkSlots.forEach((slot) => {
+      if (slot) {
+        const network = NETWORK_EQUIPMENT[slot.level - 1]
+        totalEnergy += network.energy
+      }
+    })
+
+    // Add energy from teachers
+    teacherSlots.forEach((slot) => {
+      if (slot) {
+        const teacher = TEACHERS[slot.level - 1]
+        totalEnergy += teacher.energy
       }
     })
 
@@ -427,6 +586,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const {
       money,
       classroomSlots,
+      networkSlots,
       globalModifiers,
       serverRoomLevel,
       generatorLevel,
@@ -441,7 +601,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (money < cost) return
 
-    // Calculate energy after upgrade (only PCs count)
+    // Calculate energy after upgrade (PCs + Network)
     let totalEnergy = 0
 
     // Add energy from all PCs (with upgraded one)
@@ -454,6 +614,14 @@ export const useGameStore = create<GameState>((set, get) => ({
           const pc = CLASSROOM_PCS[s.level - 1]
           totalEnergy += pc.energy
         }
+      }
+    })
+
+    // Add energy from network
+    networkSlots.forEach((s) => {
+      if (s) {
+        const network = NETWORK_EQUIPMENT[s.level - 1]
+        totalEnergy += network.energy
       }
     })
 
@@ -473,6 +641,266 @@ export const useGameStore = create<GameState>((set, get) => ({
     })
   },
 
+  buyNetwork: (slotIndex) => {
+    const {
+      money,
+      networkSlots,
+      teacherSlots,
+      globalModifiers,
+      generatorLevel,
+      classroomSlots,
+      setErrorMessage,
+    } = get()
+    if (networkSlots[slotIndex]) return
+
+    const networkConfig = NETWORK_EQUIPMENT[0]
+    const cost = networkConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Calculate energy after purchase
+    let totalEnergy = 0
+
+    // Add energy from existing PCs
+    classroomSlots.forEach((slot) => {
+      if (slot) {
+        const pc = CLASSROOM_PCS[slot.level - 1]
+        totalEnergy += pc.energy
+      }
+    })
+
+    // Add energy from existing network
+    networkSlots.forEach((slot) => {
+      if (slot) {
+        const network = NETWORK_EQUIPMENT[slot.level - 1]
+        totalEnergy += network.energy
+      }
+    })
+
+    // Add energy from teachers
+    teacherSlots.forEach((slot) => {
+      if (slot) {
+        const teacher = TEACHERS[slot.level - 1]
+        totalEnergy += teacher.energy
+      }
+    })
+
+    // Add energy from new network equipment
+    totalEnergy += networkConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    const currentCapacity = generatorConfig.capacity
+
+    if (totalEnergy > currentCapacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...networkSlots]
+    newSlots[slotIndex] = { level: 1 }
+    set({
+      money: money - cost,
+      networkSlots: newSlots,
+    })
+  },
+
+  upgradeNetwork: (slotIndex) => {
+    const {
+      money,
+      networkSlots,
+      teacherSlots,
+      globalModifiers,
+      generatorLevel,
+      classroomSlots,
+      setErrorMessage,
+    } = get()
+    const slot = networkSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextLevelConfig = NETWORK_EQUIPMENT[slot.level]
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Calculate energy after upgrade
+    let totalEnergy = 0
+
+    // Add energy from PCs
+    classroomSlots.forEach((slot) => {
+      if (slot) {
+        const pc = CLASSROOM_PCS[slot.level - 1]
+        totalEnergy += pc.energy
+      }
+    })
+
+    // Add energy from all network (with upgraded one)
+    networkSlots.forEach((s, idx) => {
+      if (s) {
+        if (idx === slotIndex) {
+          // Use next level energy for this network
+          totalEnergy += nextLevelConfig.energy
+        } else {
+          const network = NETWORK_EQUIPMENT[s.level - 1]
+          totalEnergy += network.energy
+        }
+      }
+    })
+
+    // Add energy from teachers
+    teacherSlots.forEach((slot) => {
+      if (slot) {
+        const teacher = TEACHERS[slot.level - 1]
+        totalEnergy += teacher.energy
+      }
+    })
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    const currentCapacity = generatorConfig.capacity
+
+    if (totalEnergy > currentCapacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...networkSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+    set({
+      money: money - cost,
+      networkSlots: newSlots,
+    })
+  },
+
+  buyTeacher: (slotIndex) => {
+    const {
+      money,
+      teacherSlots,
+      globalModifiers,
+      generatorLevel,
+      classroomSlots,
+      networkSlots,
+      setErrorMessage,
+    } = get()
+    if (teacherSlots[slotIndex]) return
+
+    const teacherConfig = TEACHERS[0]
+    const cost = teacherConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Calculate energy after purchase
+    let totalEnergy = 0
+
+    // Add energy from existing PCs
+    classroomSlots.forEach((slot) => {
+      if (slot) {
+        const pc = CLASSROOM_PCS[slot.level - 1]
+        totalEnergy += pc.energy
+      }
+    })
+
+    // Add energy from existing network
+    networkSlots.forEach((slot) => {
+      if (slot) {
+        const network = NETWORK_EQUIPMENT[slot.level - 1]
+        totalEnergy += network.energy
+      }
+    })
+
+    // Add energy from existing teachers
+    teacherSlots.forEach((slot) => {
+      if (slot) {
+        const teacher = TEACHERS[slot.level - 1]
+        totalEnergy += teacher.energy
+      }
+    })
+
+    // Add energy from new teacher
+    totalEnergy += teacherConfig.energy
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    const currentCapacity = generatorConfig.capacity
+
+    if (totalEnergy > currentCapacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...teacherSlots]
+    newSlots[slotIndex] = { level: 1 }
+    set({
+      money: money - cost,
+      teacherSlots: newSlots,
+    })
+  },
+
+  upgradeTeacher: (slotIndex) => {
+    const {
+      money,
+      teacherSlots,
+      globalModifiers,
+      generatorLevel,
+      classroomSlots,
+      networkSlots,
+      setErrorMessage,
+    } = get()
+    const slot = teacherSlots[slotIndex]
+    if (!slot) return
+    if (slot.level >= 10) return
+
+    const nextLevelConfig = TEACHERS[slot.level]
+    const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
+
+    if (money < cost) return
+
+    // Calculate energy after upgrade
+    let totalEnergy = 0
+
+    // Add energy from PCs
+    classroomSlots.forEach((slot) => {
+      if (slot) {
+        const pc = CLASSROOM_PCS[slot.level - 1]
+        totalEnergy += pc.energy
+      }
+    })
+
+    // Add energy from network
+    networkSlots.forEach((slot) => {
+      if (slot) {
+        const network = NETWORK_EQUIPMENT[slot.level - 1]
+        totalEnergy += network.energy
+      }
+    })
+
+    // Add energy from all teachers (with upgraded one)
+    teacherSlots.forEach((s, idx) => {
+      if (s) {
+        if (idx === slotIndex) {
+          // Use next level energy for this teacher
+          totalEnergy += nextLevelConfig.energy
+        } else {
+          const teacher = TEACHERS[s.level - 1]
+          totalEnergy += teacher.energy
+        }
+      }
+    })
+
+    const generatorConfig = GENERATOR_LEVELS[generatorLevel - 1]
+    const currentCapacity = generatorConfig.capacity
+
+    if (totalEnergy > currentCapacity) {
+      setErrorMessage("Pas assez d'électricité ! Il faut améliorer le générateur.")
+      return
+    }
+
+    const newSlots = [...teacherSlots]
+    newSlots[slotIndex] = { level: slot.level + 1 }
+    set({
+      money: money - cost,
+      teacherSlots: newSlots,
+    })
+  },
+
   tickUpdate: () => {
     set((state) => {
       let grossServerIncome = 0
@@ -489,16 +917,14 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
       })
 
-      // Apply CO2 Reduction from Techs
-      totalCo2 = totalCo2 * (1 - state.globalModifiers.co2Reduction)
-
       const roomConfig = SERVER_ROOM_LEVELS[state.serverRoomLevel - 1]
       const taxAmount = grossServerIncome * roomConfig.taxRate
       const netServerIncome = grossServerIncome - taxAmount
 
-      // Classroom PC Income & Energy
+      // Classroom PC Income & Energy & CO2
       let classroomIncome = 0
       let classroomEnergy = 0
+      let classroomCo2 = 0
       let visualStudents = 0
 
       state.classroomSlots.forEach((slot) => {
@@ -506,28 +932,64 @@ export const useGameStore = create<GameState>((set, get) => ({
           const pc = CLASSROOM_PCS[slot.level - 1]
           classroomIncome += pc.income
           classroomEnergy += pc.energy
+          classroomCo2 += pc.co2
           visualStudents++
         }
       })
 
-      // Research Lab Income
-      const researchConfig = RESEARCH_LAB_LEVELS[state.researchLabLevel - 1]
-      const researchIncome = researchConfig.rpGeneration
+      // Network Equipment Income & Energy
+      let networkIncome = 0
+      let networkEnergy = 0
 
-      // Total Energy Usage (only PCs count, not server room base energy)
-      const currentEnergyUsage = classroomEnergy
+      state.networkSlots.forEach((slot) => {
+        if (slot) {
+          const network = NETWORK_EQUIPMENT[slot.level - 1]
+          networkIncome += network.income
+          networkEnergy += network.energy
+        }
+      })
+
+      // Teachers Income & Energy
+      let teacherIncome = 0
+      let teacherEnergy = 0
+
+      state.teacherSlots.forEach((slot) => {
+        if (slot) {
+          const teacher = TEACHERS[slot.level - 1]
+          teacherIncome += teacher.income
+          teacherEnergy += teacher.energy
+        }
+      })
+
+      // Add classroom CO2 to total
+      totalCo2 += classroomCo2
+
+      // Apply CO2 Reduction from Techs (after adding all sources)
+      const currentCo2 = totalCo2 * (1 - state.globalModifiers.co2Reduction)
+
+      // Research Lab Income (only if research room is unlocked)
+      const researchRoom = state.rooms.find((r) => r.type === 'research')
+      const isResearchRoomUnlocked = researchRoom?.unlocked ?? false
+      const researchConfig = RESEARCH_LAB_LEVELS[state.researchLabLevel - 1]
+      const researchIncome = isResearchRoomUnlocked ? researchConfig.rpGeneration : 0
+
+      // Total Energy Usage (PCs + Network + Teachers, not server room base energy)
+      const currentEnergyUsage = classroomEnergy + networkEnergy + teacherEnergy
 
       const generatorConfig = GENERATOR_LEVELS[state.generatorLevel - 1]
       const currentCapacity = generatorConfig.capacity
 
       const isPowered = currentCapacity >= currentEnergyUsage
-      const finalIncome = isPowered ? netServerIncome + classroomIncome : 0
+      // Add network and teacher income to total
+      const finalIncome = isPowered
+        ? netServerIncome + classroomIncome + networkIncome + teacherIncome
+        : 0
 
       return {
         tick: state.tick + 1,
         money: state.money + finalIncome,
-        research: state.research + (isPowered ? researchIncome : 0), // Lab needs power? Let's assume yes for now, or maybe it's separate. Let's assume it needs power to function if we want to be strict, but for now let's just give it. Actually, let's make it depend on global power.
-        co2: state.co2 + totalCo2,
+        research: state.research + (isPowered ? researchIncome : 0),
+        co2: currentCo2, // Current CO2 level (not accumulated, like energy)
         energyCapacity: currentCapacity,
         energyUsage: currentEnergyUsage,
         studentCount: visualStudents,

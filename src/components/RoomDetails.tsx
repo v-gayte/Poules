@@ -7,6 +7,8 @@ import {
   TECH_TREE,
   CLASSROOM_LEVELS,
   CLASSROOM_PCS,
+  NETWORK_EQUIPMENT,
+  TEACHERS,
   GYM_LEVELS,
   GYM_QUESTIONS,
   GYM_ACTIVITIES,
@@ -78,38 +80,76 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
     const nextConfig = CLASSROOM_LEVELS[level]
 
     return (
-      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-80 overflow-hidden">
+      <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-96 overflow-hidden">
         {/* LEFT: Room Stats */}
-        <div className="w-1/3 border-r border-gray-700 pr-6">
+        <div className="w-1/3 border-r border-gray-700 pr-6 overflow-y-auto">
           <h2 className="text-2xl font-bold text-yellow-400 mb-2">
             {config.name} (Lvl {level})
           </h2>
-          <p className="text-gray-400 mb-4">Manage your student PCs.</p>
+          <p className="text-gray-400 mb-4">Manage your student PCs and network.</p>
 
           <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
-            <div className="text-sm text-gray-500">Capacity</div>
-            <div className="text-3xl font-bold text-white">{config.capacity} Slots</div>
+            <div className="text-sm text-gray-500">PC Capacity</div>
+            <div className="text-3xl font-bold text-white">8 Slots</div>
           </div>
 
-          {nextConfig ? (
+          {store.networkSlots.length > 0 && (
+            <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+              <div className="text-sm text-gray-500">Network Slots</div>
+              <div className="text-3xl font-bold text-white">{store.networkSlots.length} / 1</div>
+            </div>
+          )}
+
+          {store.teacherSlots.length > 0 && (
+            <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+              <div className="text-sm text-gray-500">Teacher Slots</div>
+              <div className="text-3xl font-bold text-white">{store.teacherSlots.length} / 3</div>
+            </div>
+          )}
+
+          {store.networkSlots.length === 0 ? (
+            nextConfig ? (
+              <button
+                onClick={store.upgradeClassroom}
+                disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction)}
+                className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
+              >
+                Add Network Slot ($
+                {(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
+              </button>
+            ) : (
+              <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
+            )
+          ) : store.teacherSlots.length < 3 ? (
             <button
               onClick={store.upgradeClassroom}
-              disabled={store.money < nextConfig.cost * (1 - store.globalModifiers.costReduction)}
+              disabled={
+                store.money <
+                (nextConfig
+                  ? nextConfig.cost * (1 - store.globalModifiers.costReduction)
+                  : CLASSROOM_LEVELS[level - 1].cost * (1 - store.globalModifiers.costReduction))
+              }
               className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
             >
-              Expand Room ($
-              {(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
+              Add Teacher Slot ($
+              {(
+                (nextConfig ? nextConfig.cost : CLASSROOM_LEVELS[level - 1].cost) *
+                (1 - store.globalModifiers.costReduction)
+              ).toLocaleString()}
+              )
             </button>
           ) : (
-            <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
+            <div className="text-green-400 font-bold">SALLE AU MAXIMUM</div>
           )}
         </div>
 
-        {/* RIGHT: PC Slots */}
+        {/* RIGHT: PC Slots & Network */}
         <div className="flex-1 overflow-y-auto">
-          <h3 className="font-bold text-gray-300 mb-4 sticky top-0 bg-gray-800 pb-2">
-            Student PCs ({store.classroomSlots.filter((s) => s).length}/{config.capacity})
-          </h3>
+          <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4">
+            <h3 className="font-bold text-gray-300">
+              Student PCs ({store.classroomSlots.filter((s) => s).length}/8)
+            </h3>
+          </div>
           <div className="grid grid-cols-5 gap-3">
             {store.classroomSlots.map((slot, index) => {
               if (slot) {
@@ -119,20 +159,24 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                 return (
                   <div
                     key={index}
-                    className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center"
+                    className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center z-0"
                   >
                     <div className="text-2xl mb-1">{pc.icon}</div>
                     <div className="font-bold text-xs text-white truncate">{pc.name}</div>
                     <div className="text-[10px] text-green-400">+${pc.income}/s</div>
                     <div className="text-[10px] text-yellow-400">+{pc.energy}⚡</div>
+                    <div className="text-[10px] text-red-400">+{pc.co2} CO₂</div>
 
                     {nextPc && (
-                      <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1">
+                      <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
                         <div className="text-[10px] text-gray-300 mb-1">
                           Upgrade to {nextPc.name}
                         </div>
                         <div className="text-[10px] text-yellow-400 mb-1">
                           +{nextPc.energy - pc.energy}⚡
+                        </div>
+                        <div className="text-[10px] text-red-400 mb-1">
+                          +{nextPc.co2 - pc.co2} CO₂
                         </div>
                         <button
                           onClick={() => store.upgradeClassroomPC(index)}
@@ -169,6 +213,164 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
               }
             })}
           </div>
+
+          {/* Network Equipment Slots - Only show if at least one slot exists */}
+          {store.networkSlots.length > 0 && (
+            <>
+              <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4 mt-6">
+                <h3 className="font-bold text-gray-300">
+                  Network Equipment ({store.networkSlots.filter((s) => s).length}/4)
+                </h3>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {Array.from({ length: 4 }, (_, index) => {
+                  const slot = store.networkSlots[index] || null
+                  if (slot) {
+                    const network = NETWORK_EQUIPMENT[slot.level - 1]
+                    const nextNetwork = NETWORK_EQUIPMENT[slot.level]
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center z-0"
+                      >
+                        <div className="text-2xl mb-1">{network.icon}</div>
+                        <div className="font-bold text-xs text-white truncate">{network.name}</div>
+                        <div className="text-[10px] text-green-400">+${network.income}/s</div>
+                        <div className="text-[10px] text-yellow-400">+{network.energy}⚡</div>
+
+                        {nextNetwork && (
+                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
+                            <div className="text-[10px] text-gray-300 mb-1">
+                              Upgrade to {nextNetwork.name}
+                            </div>
+                            <div className="text-[10px] text-green-400 mb-1">
+                              +${nextNetwork.income - network.income}/s
+                            </div>
+                            <div className="text-[10px] text-yellow-400 mb-1">
+                              +{nextNetwork.energy - network.energy}⚡
+                            </div>
+                            <button
+                              onClick={() => store.upgradeNetwork(index)}
+                              disabled={
+                                store.money <
+                                nextNetwork.cost * (1 - store.globalModifiers.costReduction)
+                              }
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
+                            >
+                              $
+                              {(
+                                nextNetwork.cost *
+                                (1 - store.globalModifiers.costReduction)
+                              ).toLocaleString()}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  } else {
+                    const baseNetwork = NETWORK_EQUIPMENT[0]
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800"
+                        onClick={() => store.buyNetwork(index)}
+                      >
+                        <span className="text-xs text-gray-500">Empty</span>
+                        <div className="text-xs text-green-400 font-bold">+ Buy</div>
+                        <div className="text-[10px] text-gray-400">
+                          $
+                          {(
+                            baseNetwork.cost *
+                            (1 - store.globalModifiers.costReduction)
+                          ).toLocaleString()}
+                        </div>
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Teachers Slots - Only show if at least one slot exists */}
+          {store.teacherSlots.length > 0 && (
+            <>
+              <div className="sticky top-0 bg-gray-800 z-10 pb-2 mb-4 mt-6">
+                <h3 className="font-bold text-gray-300">
+                  Teachers ({store.teacherSlots.filter((s) => s).length}/3)
+                </h3>
+              </div>
+              <div className="grid grid-cols-5 gap-3">
+                {Array.from({ length: 3 }, (_, index) => {
+                  const slot = store.teacherSlots[index] || null
+                  if (slot) {
+                    const teacher = TEACHERS[slot.level - 1]
+                    const nextTeacher = TEACHERS[slot.level]
+
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-700 p-2 rounded border border-gray-600 relative group text-center z-0"
+                      >
+                        <div className="text-2xl mb-1">{teacher.icon}</div>
+                        <div className="font-bold text-xs text-white truncate">{teacher.name}</div>
+                        <div className="text-[10px] text-green-400">+${teacher.income}/s</div>
+                        <div className="text-[10px] text-yellow-400">+{teacher.energy}⚡</div>
+
+                        {nextTeacher && (
+                          <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
+                            <div className="text-[10px] text-gray-300 mb-1">
+                              Upgrade to {nextTeacher.name}
+                            </div>
+                            <div className="text-[10px] text-green-400 mb-1">
+                              +${nextTeacher.income - teacher.income}/s
+                            </div>
+                            <div className="text-[10px] text-yellow-400 mb-1">
+                              +{nextTeacher.energy - teacher.energy}⚡
+                            </div>
+                            <button
+                              onClick={() => store.upgradeTeacher(index)}
+                              disabled={
+                                store.money <
+                                nextTeacher.cost * (1 - store.globalModifiers.costReduction)
+                              }
+                              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
+                            >
+                              $
+                              {(
+                                nextTeacher.cost *
+                                (1 - store.globalModifiers.costReduction)
+                              ).toLocaleString()}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  } else {
+                    const baseTeacher = TEACHERS[0]
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-900/50 p-2 rounded border border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 min-h-[80px] group cursor-pointer hover:bg-gray-800"
+                        onClick={() => store.buyTeacher(index)}
+                      >
+                        <span className="text-xs text-gray-500">Empty</span>
+                        <div className="text-xs text-green-400 font-bold">+ Buy</div>
+                        <div className="text-[10px] text-gray-400">
+                          $
+                          {(
+                            baseTeacher.cost *
+                            (1 - store.globalModifiers.costReduction)
+                          ).toLocaleString()}
+                        </div>
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white">
