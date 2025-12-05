@@ -35,8 +35,10 @@ interface TeacherSlot {
 interface RoomInstance {
   id: string
   type: string
-  x: number
-  y: number
+  x1: number
+  y1: number
+  x2: number
+  y2: number
   unlocked: boolean
   cost: number
 }
@@ -524,6 +526,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       money,
       classroomSlots,
       networkSlots,
+      teacherSlots, // Added missing teacherSlots
       globalModifiers,
       serverRoomLevel,
       generatorLevel,
@@ -587,6 +590,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       money,
       classroomSlots,
       networkSlots,
+      teacherSlots, // Added missing teacherSlots
       globalModifiers,
       serverRoomLevel,
       generatorLevel,
@@ -622,6 +626,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (s) {
         const network = NETWORK_EQUIPMENT[s.level - 1]
         totalEnergy += network.energy
+      }
+    })
+
+    // Add energy from teachers
+    teacherSlots.forEach((slot) => {
+      if (slot) {
+        const teacher = TEACHERS[slot.level - 1]
+        totalEnergy += teacher.energy
       }
     })
 

@@ -680,18 +680,18 @@ export const ROOMS = {
 
 export const DEFAULT_MAP = [
   // Top
-  { id: 'research-main', type: 'research', x: 48, y: 15, unlocked: false, cost: 10000 },
+  { id: 'research-main', type: 'research', x1: 41, y1: 9, x2: 54, y2: 22, unlocked: false, cost: 10000 },
 
   // Middle Left
-  { id: 'server-main', type: 'server', x: 36, y: 35, unlocked: false, cost: 0 },
+  { id: 'server-main', type: 'server', x1: 31, y1: 28, x2: 42, y2: 41, unlocked: false, cost: 0 },
 
   // Middle Right
-  { id: 'gym-main', type: 'gym', x: 60, y: 28, unlocked: false, cost: 5000 },
-  { id: 'arcade-main', type: 'arcade', x: 61, y: 42, unlocked: false, cost: 8000 },
+  { id: 'gym-main', type: 'gym', x1: 55, y1: 25, x2: 68, y2: 32, unlocked: false, cost: 5000 },
+  { id: 'arcade-main', type: 'arcade', x1: 55, y1: 39, x2: 68, y2: 46, unlocked: false, cost: 8000 },
 
   // Bottom
-  { id: 'classroom-0', type: 'classroom', x: 15, y: 57, unlocked: false, cost: 5000 },
-  { id: 'classroom-1', type: 'classroom', x: 30, y: 57, unlocked: true, cost: 0 },
-  { id: 'classroom-2', type: 'classroom', x: 65, y: 57, unlocked: false, cost: 5000 },
-  { id: 'classroom-3', type: 'classroom', x: 80, y: 57, unlocked: false, cost: 15000 },
+  { id: 'classroom-0', type: 'classroom', x1: 8, y1: 51, x2: 19, y2: 64, unlocked: false, cost: 5000 },
+  { id: 'classroom-1', type: 'classroom', x1: 24, y1: 51, x2: 35, y2: 64, unlocked: true, cost: 0 },
+  { id: 'classroom-2', type: 'classroom', x1: 60, y1: 51, x2: 71, y2: 64, unlocked: false, cost: 5000 },
+  { id: 'classroom-3', type: 'classroom', x1: 76, y1: 51, x2: 87, y2: 64, unlocked: false, cost: 15000 },
 ]

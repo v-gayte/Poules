@@ -65,8 +65,20 @@ export class MainScene extends Phaser.Scene {
         const state = useGameStore.getState();
 
         const room = state.rooms.find(r => {
-          const config = ROOMS[r.type as keyof typeof ROOMS];
-          return x >= r.x && x < r.x + config.width && y >= r.y && y < r.y + config.height;
+          // Check if point is within x1 (inclusive) and x2 (exclusive? or inclusive?)
+          // Usually x2 is "bottom right corner", so width = x2 - x1.
+          // Let's assume user inputs inclusive coords or bounding box.
+          // If the user says "coordinate top left and bottom right to take whole room",
+          // typically that means the area FROM x1 TO x2.
+          // Let's interpret width = x2 - x1, so x2 is exclusive bound, or x2 is the index of the last tile?
+          // If x1=0, x2=1, is it 1 tile wide? Yes if x2 is exclusive or width.
+          // "Point en bas à droite" implies inclusive usually.
+          // Let's assume inclusive range for tiles: x >= x1 && x <= x2 ?
+          // But gameConfig replaced structure implied x2 as a coordinate.
+          // Let's assume x2, y2 is the coordinate of the last tile INCLUDED.
+          // Then width in tiles = x2 - x1 + 1.
+          
+          return x >= r.x1 && x <= r.x2 && y >= r.y1 && y <= r.y2;
         });
 
         if (room) {
@@ -118,10 +130,17 @@ export class MainScene extends Phaser.Scene {
       const config = ROOMS[room.type as keyof typeof ROOMS];
       if (!config) return;
 
-      const pixelX = room.x * this.gridSize;
-      const pixelY = room.y * this.gridSize;
-      const pixelW = config.width * this.gridSize;
-      const pixelH = config.height * this.gridSize;
+      // Calculate dimensions from x1, y1, x2, y2
+      // Assuming inclusive coordinates: width = (x2 - x1 + 1) * gridSize
+      // Assuming x,y (top-left) = x1 * gridSize
+      
+      const widthInTiles = (room.x2 - room.x1 + 1);
+      const heightInTiles = (room.y2 - room.y1 + 1);
+
+      const pixelX = room.x1 * this.gridSize;
+      const pixelY = room.y1 * this.gridSize;
+      const pixelW = widthInTiles * this.gridSize;
+      const pixelH = heightInTiles * this.gridSize;
 
       const rect = this.add.rectangle(
         pixelX + pixelW / 2,
@@ -132,17 +151,28 @@ export class MainScene extends Phaser.Scene {
       );
       rect.setName('room');
       rect.setStrokeStyle(2, 0xffffff);
-      rect.setAlpha(room.unlocked ? 1 : 0.3);
+      
+      // If unlocked, fill is transparent (0) to see tiles.
+      // If locked, fill is semi-transparent (0.3).
+      rect.setFillStyle(config.color, room.unlocked ? 0 : 0.3);
 
-      const emoji = this.add.text(
-        pixelX + pixelW / 2,
-        pixelY + pixelH / 2,
-        room.unlocked ? config.emoji : '🔒',
-        { fontSize: '32px' }
-      );
-      emoji.setOrigin(0.5);
-      emoji.setName('room');
+      if (!room.unlocked) {
+        const emoji = this.add.text(
+            pixelX + pixelW / 2,
+            pixelY + pixelH / 2,
+            '🔒',
+            { fontSize: '32px' }
+        );
+        emoji.setOrigin(0.5);
+        emoji.setName('room');
+      }
 
+      // Only show text/emoji if locked? Or always?
+      // User said "la case devienne transparente". Usually implies seeing the tiles.
+      // Maybe we hide the emoji too if it covers the tiles?
+      // But we need to know what room it is.
+      // Let's keep the emoji/text for now, just transparent background.
+      
       const text = this.add.text(
         pixelX + 4,
         pixelY + 4,
@@ -161,7 +191,8 @@ export class MainScene extends Phaser.Scene {
         costText.setOrigin(0.5);
         costText.setName('room');
       } else {
-        rect.setAlpha(1);
+        // Unlocked: transparent background, but keep border/text
+        // rect.setAlpha(1); // Removed matching redundant logic
       }
     });
   }
