@@ -207,6 +207,7 @@ export interface ServerAssetType {
   name: string
   baseCost: number
   minRoomLevel: number
+  techReq?: string // Optional tech requirement
   grades: ServerAssetGrade[]
 }
 
@@ -227,6 +228,7 @@ export const SERVER_ASSETS: Record<string, ServerAssetType> = {
     name: 'Serveur Rack',
     baseCost: 1200,
     minRoomLevel: 4,
+    techReq: 'T_RACK', // Requires new tech
     grades: [
       { grade: 1, name: 'Standard', upgradeCost: 0, income: 80, co2: 5 },
       { grade: 2, name: 'Optimisé', upgradeCost: 800, income: 120, co2: 4 },
@@ -238,6 +240,7 @@ export const SERVER_ASSETS: Record<string, ServerAssetType> = {
     name: 'Lame Quantique',
     baseCost: 8500,
     minRoomLevel: 8,
+    techReq: 'T_QUANTUM', // Requires new tech
     grades: [
       { grade: 1, name: 'Standard', upgradeCost: 0, income: 450, co2: 0 },
       { grade: 2, name: 'Stable', upgradeCost: 5000, income: 675, co2: 0 },
@@ -264,13 +267,14 @@ export interface TechNode {
   name: string
   cost: number
   description: string
-  category: 'INFRA' | 'ECOLOGY' | 'ECONOMY'
+  category: 'INFRA' | 'CLASSROOM' | 'GYM' | 'ARCADE' | 'ECOLOGY' | 'ECONOMY'
   effects: TechEffect[]
-  req?: string // Prerequisite tech ID
+  reqs: string[] // List of Prerequisite tech IDs
+  position: { x: number; y: number } // Grid position for UI: x (col), y (row)
 }
 
 export const TECH_TREE: TechNode[] = [
-  // INFRASTRUCTURE (Server Room Unlocks)
+  // --- INFRASTRUCTURE (Server Room) [Cols 0-3] ---
   {
     id: 'T1',
     name: 'Réseau Basique',
@@ -278,6 +282,8 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 1',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 1, target: 'server' }],
+    reqs: [],
+    position: { x: 1, y: 0 },
   },
   {
     id: 'T2',
@@ -286,7 +292,8 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 3',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 3, target: 'server' }],
-    req: 'T1',
+    reqs: ['T1'],
+    position: { x: 1, y: 1 },
   },
   {
     id: 'T3',
@@ -295,7 +302,18 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 5',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 5, target: 'server' }],
-    req: 'T2',
+    reqs: ['T2'],
+    position: { x: 1, y: 2 },
+  },
+  {
+    id: 'T_RACK',
+    name: 'Rack Mounts',
+    cost: 7000,
+    description: 'Débloque les serveurs Rack',
+    category: 'INFRA',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'rack', target: 'server' }],
+    reqs: ['T3'],
+    position: { x: 2, y: 2 }, // Branch
   },
   {
     id: 'T4',
@@ -304,7 +322,8 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 6',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 6, target: 'server' }],
-    req: 'T3',
+    reqs: ['T3'],
+    position: { x: 1, y: 3 },
   },
   {
     id: 'T5',
@@ -313,7 +332,8 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 7',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 7, target: 'server' }],
-    req: 'T4',
+    reqs: ['T4'],
+    position: { x: 1, y: 4 },
   },
   {
     id: 'T6',
@@ -322,7 +342,8 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 8',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 8, target: 'server' }],
-    req: 'T5',
+    reqs: ['T5'],
+    position: { x: 0, y: 5 },
   },
   {
     id: 'T7',
@@ -331,7 +352,8 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 9',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 9, target: 'server' }],
-    req: 'T6',
+    reqs: ['T5'],
+    position: { x: 2, y: 5 },
   },
   {
     id: 'T8',
@@ -340,10 +362,217 @@ export const TECH_TREE: TechNode[] = [
     description: 'Débloque Server Room Niv 10',
     category: 'INFRA',
     effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 10, target: 'server' }],
-    req: 'T7',
+    reqs: ['T6', 'T7'],
+    position: { x: 1, y: 6 },
+  },
+  {
+    id: 'T_QUANTUM',
+    name: 'Physique Quantique',
+    cost: 300000,
+    description: 'Débloque les serveurs Quantiques',
+    category: 'INFRA',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'quantum', target: 'server' }],
+    reqs: ['T8'],
+    position: { x: 2, y: 6 }, // Next to T8
   },
 
-  // ECOLOGY (CO2 Reduction)
+  // --- CLASSROOM [Cols 4-7] ---
+  {
+    id: 'C1',
+    name: 'Pédagogie 1.0',
+    cost: 200,
+    description: 'Débloque le recrutement de Surveillants',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'teacher_1', target: 'classroom' }],
+    reqs: [],
+    position: { x: 5, y: 0 },
+  },
+  {
+    id: 'C2',
+    name: 'Postes Informatiques',
+    cost: 500,
+    description: 'Débloque les PCs Basiques',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'pc_1', target: 'classroom' }],
+    reqs: ['C1'],
+    position: { x: 6, y: 0 },
+  },
+  {
+    id: 'C3',
+    name: 'Réseau Scolaire',
+    cost: 1500,
+    description: 'Débloque le Câblage Ethernet et Wi-Fi',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'network_1', target: 'classroom' }],
+    reqs: ['C2'],
+    position: { x: 5, y: 1 },
+  },
+  {
+    id: 'C4',
+    name: 'Formation Continue',
+    cost: 4000,
+    description: 'Débloque les Professeurs Certifiés',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'teacher_4', target: 'classroom' }],
+    reqs: ['C1'],
+    position: { x: 4, y: 1 },
+  },
+  {
+    id: 'C5',
+    name: 'E-Learning',
+    cost: 8000,
+    description: 'Débloque les PCs Avancés (Tour Gamer)',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'pc_4', target: 'classroom' }],
+    reqs: ['C3', 'C4'],
+    position: { x: 5, y: 2 },
+  },
+  {
+    id: 'C6',
+    name: 'Haut Débit',
+    cost: 15000,
+    description: 'Débloque la Fibre Optique',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'network_4', target: 'classroom' }],
+    reqs: ['C3'],
+    position: { x: 6, y: 2 },
+  },
+  {
+    id: 'C7',
+    name: 'Réalité Virtuelle',
+    cost: 40000,
+    description: 'Débloque les Stations de Montage',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'pc_7', target: 'classroom' }],
+    reqs: ['C5', 'C6'],
+    position: { x: 5, y: 3 },
+  },
+  {
+    id: 'C8',
+    name: 'Campus I.A.',
+    cost: 100000,
+    description: 'Débloque les Docteurs en IT',
+    category: 'CLASSROOM',
+    effects: [{ type: 'UNLOCK_FEATURE', value: 'teacher_6', target: 'classroom' }],
+    reqs: ['C7'],
+    position: { x: 5, y: 4 },
+  },
+
+  // --- GYM [Cols 8-10] ---
+  {
+    id: 'G1',
+    name: 'Éducation Physique',
+    cost: 1000,
+    description: 'Débloque le Profilage (Niv 1)',
+    category: 'GYM',
+    effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 1, target: 'gym' }],
+    reqs: [],
+    position: { x: 9, y: 0 },
+  },
+  {
+    id: 'G2',
+    name: 'Nutrition Sportive',
+    cost: 3000,
+    description: 'Débloque le Coaching (Niv 2)',
+    category: 'GYM',
+    effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 2, target: 'gym' }],
+    reqs: ['G1'],
+    position: { x: 9, y: 1 },
+  },
+  {
+    id: 'G3',
+    name: 'Équipement Pro',
+    cost: 8000,
+    description: 'Meilleurs résultats (Bonus passif)',
+    category: 'GYM',
+    effects: [{ type: 'COST_REDUCTION', value: 0.05 }],
+    reqs: ['G2'],
+    position: { x: 8, y: 2 },
+  },
+  {
+    id: 'G4',
+    name: 'Marketing Sportif',
+    cost: 15000,
+    description: 'Débloque le Visuel (Niv 3)',
+    category: 'GYM',
+    effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 3, target: 'gym' }],
+    reqs: ['G2'],
+    position: { x: 10, y: 2 },
+  },
+  {
+    id: 'G5',
+    name: 'Sponsoring',
+    cost: 30000,
+    description: 'Débloque la Monétisation (Niv 4)',
+    category: 'GYM',
+    effects: [{ type: 'UNLOCK_ROOM_LEVEL', value: 4, target: 'gym' }],
+    reqs: ['G4'],
+    position: { x: 9, y: 3 },
+  },
+  {
+    id: 'G6',
+    name: 'Compétitions',
+    cost: 60000,
+    description: 'Augmente les rewards Gym',
+    category: 'GYM',
+    effects: [{ type: 'COST_REDUCTION', value: 0.1 }], // Placeholder effect
+    reqs: ['G5'],
+    position: { x: 9, y: 4 },
+  },
+
+  // --- ARCADE [Cols 11-13] ---
+  {
+    id: 'A1',
+    name: 'Bornes d\'Arcade',
+    cost: 5000,
+    description: 'Débloque l\'Arcade Room (Future)',
+    category: 'ARCADE',
+    effects: [],
+    reqs: [],
+    position: { x: 12, y: 0 },
+  },
+  {
+    id: 'A2',
+    name: 'Jeux Rétro',
+    cost: 10000,
+    description: 'Améliore l\'attractivité',
+    category: 'ARCADE',
+    effects: [],
+    reqs: ['A1'],
+    position: { x: 12, y: 1 },
+  },
+  {
+    id: 'A3',
+    name: 'Réalité Augmentée',
+    cost: 25000,
+    description: 'Technologie AR',
+    category: 'ARCADE',
+    effects: [],
+    reqs: ['A2'],
+    position: { x: 11, y: 2 },
+  },
+  {
+    id: 'A4',
+    name: 'Metaverse',
+    cost: 60000,
+    description: 'Immersion totale',
+    category: 'ARCADE',
+    effects: [],
+    reqs: ['A3'],
+    position: { x: 12, y: 3 },
+  },
+  {
+    id: 'A5',
+    name: 'eSports',
+    cost: 150000,
+    description: 'Compétitions Mondiales',
+    category: 'ARCADE',
+    effects: [],
+    reqs: ['A4'],
+    position: { x: 13, y: 3 },
+  },
+
+  // ECOLOGY (CO2 Reduction) - Cols 0-2 (Lower rows)
   {
     id: 'E1',
     name: 'Recyclage Papier',
@@ -351,6 +580,8 @@ export const TECH_TREE: TechNode[] = [
     description: '-5% CO2 Global',
     category: 'ECOLOGY',
     effects: [{ type: 'CO2_REDUCTION', value: 0.05 }],
+    reqs: [],
+    position: { x: 0, y: 8 },
   },
   {
     id: 'E2',
@@ -359,7 +590,8 @@ export const TECH_TREE: TechNode[] = [
     description: '-10% CO2 Global',
     category: 'ECOLOGY',
     effects: [{ type: 'CO2_REDUCTION', value: 0.1 }],
-    req: 'E1',
+    reqs: ['E1'],
+    position: { x: 1, y: 8 },
   },
   {
     id: 'E3',
@@ -368,19 +600,11 @@ export const TECH_TREE: TechNode[] = [
     description: '-15% CO2 Global',
     category: 'ECOLOGY',
     effects: [{ type: 'CO2_REDUCTION', value: 0.15 }],
-    req: 'E2',
+    reqs: ['E2'],
+    position: { x: 2, y: 8 },
   },
-  {
-    id: 'E4',
-    name: 'Compensation Carbone',
-    cost: 25000,
-    description: '-20% CO2 Global',
-    category: 'ECOLOGY',
-    effects: [{ type: 'CO2_REDUCTION', value: 0.2 }],
-    req: 'E3',
-  },
-
-  // ECONOMY (Cost Reduction)
+  
+  // ECONOMY (Cost Reduction) - Cols 4-6 (Lower rows)
   {
     id: 'M1',
     name: 'Achats Groupés',
@@ -388,6 +612,8 @@ export const TECH_TREE: TechNode[] = [
     description: '-5% Coûts Amélioration',
     category: 'ECONOMY',
     effects: [{ type: 'COST_REDUCTION', value: 0.05 }],
+    reqs: [],
+    position: { x: 4, y: 8 },
   },
   {
     id: 'M2',
@@ -396,33 +622,26 @@ export const TECH_TREE: TechNode[] = [
     description: '-10% Coûts Amélioration',
     category: 'ECONOMY',
     effects: [{ type: 'COST_REDUCTION', value: 0.1 }],
-    req: 'M1',
-  },
-  {
-    id: 'M3',
-    name: 'Partenariats Stratégiques',
-    cost: 15000,
-    description: '-15% Coûts Amélioration',
-    category: 'ECONOMY',
-    effects: [{ type: 'COST_REDUCTION', value: 0.15 }],
-    req: 'M2',
+    reqs: ['M1'],
+    position: { x: 5, y: 8 },
   },
 ]
 
-// --- 5. CLASSROOM ---
+// --- 5. CLASSROOM CONFIG ---
 export interface ClassroomLevel {
   level: number
   name: string
   cost: number
   capacity: number
+  techReq?: string 
 }
 
 export const CLASSROOM_LEVELS: ClassroomLevel[] = [
   { level: 1, name: 'Salle de TD', cost: 0, capacity: 5 },
-  { level: 2, name: 'Amphi 101', cost: 2000, capacity: 10 },
-  { level: 3, name: 'Grand Amphi', cost: 5000, capacity: 20 },
-  { level: 4, name: 'Campus Numérique', cost: 15000, capacity: 40 },
-  { level: 5, name: 'Université Tech', cost: 50000, capacity: 80 },
+  { level: 2, name: 'Amphi 101', cost: 2000, capacity: 10, techReq: 'C2' },
+  { level: 3, name: 'Grand Amphi', cost: 5000, capacity: 20, techReq: 'C3' },
+  { level: 4, name: 'Campus Numérique', cost: 15000, capacity: 40, techReq: 'C5' },
+  { level: 5, name: 'Université Tech', cost: 50000, capacity: 80, techReq: 'C8' },
 ]
 
 export interface ClassroomPC {
@@ -433,17 +652,18 @@ export interface ClassroomPC {
   income: number
   co2: number
   icon: string
+  techReq?: string
 }
 
 export const CLASSROOM_PCS: ClassroomPC[] = [
   { level: 1, name: 'PC Patate', cost: 100, energy: 1, income: 5, co2: 1, icon: '🥔' },
-  { level: 2, name: 'PC Bureautique', cost: 180, energy: 2, income: 10, co2: 2, icon: '🖥️' },
-  { level: 3, name: 'Laptop Étudiant', cost: 325, energy: 3, income: 20, co2: 3, icon: '💻' },
-  { level: 4, name: 'Tour Gamer', cost: 600, energy: 4, income: 40, co2: 5, icon: '🕹️' },
-  { level: 5, name: 'Station de Montage', cost: 1100, energy: 5, income: 80, co2: 8, icon: '🎬' },
-  { level: 6, name: 'Serveur Rack', cost: 2000, energy: 6, income: 160, co2: 12, icon: '📼' },
-  { level: 7, name: 'Mining Rig', cost: 3600, energy: 7, income: 320, co2: 20, icon: '⛏️' },
-  { level: 8, name: 'Supercalculateur', cost: 6500, energy: 8, income: 640, co2: 35, icon: '🗄️' },
+  { level: 2, name: 'PC Bureautique', cost: 180, energy: 2, income: 10, co2: 2, icon: '🖥️', techReq: 'C2' },
+  { level: 3, name: 'Laptop Étudiant', cost: 325, energy: 3, income: 20, co2: 3, icon: '💻', techReq: 'C2' },
+  { level: 4, name: 'Tour Gamer', cost: 600, energy: 4, income: 40, co2: 5, icon: '🕹️', techReq: 'C4' },
+  { level: 5, name: 'Station de Montage', cost: 1100, energy: 5, income: 80, co2: 8, icon: '🎬', techReq: 'C7' },
+  { level: 6, name: 'Serveur Rack', cost: 2000, energy: 6, income: 160, co2: 12, icon: '📼', techReq: 'C7' },
+  { level: 7, name: 'Mining Rig', cost: 3600, energy: 7, income: 320, co2: 20, icon: '⛏️', techReq: 'C8' },
+  { level: 8, name: 'Supercalculateur', cost: 6500, energy: 8, income: 640, co2: 35, icon: '🗄️', techReq: 'C8' },
   {
     level: 9,
     name: 'Ordinateur Quantique',
@@ -452,8 +672,9 @@ export const CLASSROOM_PCS: ClassroomPC[] = [
     income: 1280,
     co2: 60,
     icon: '🔮',
+    techReq: 'T_QUANTUM', // Cross-dependency!
   },
-  { level: 10, name: 'I.A. Suprême', cost: 22000, energy: 10, income: 2560, co2: 100, icon: '🧠' },
+  { level: 10, name: 'I.A. Suprême', cost: 22000, energy: 10, income: 2560, co2: 100, icon: '🧠', techReq: 'T_QUANTUM' },
 ]
 
 // --- 5.5. NETWORK EQUIPMENT ---
@@ -464,18 +685,19 @@ export interface NetworkEquipment {
   energy: number
   income: number // Direct income per tick
   icon: string
+  techReq?: string
 }
 
 export const NETWORK_EQUIPMENT: NetworkEquipment[] = [
-  { level: 1, name: 'Câble Ethernet', cost: 500, energy: 5, income: 10, icon: '🔵' },
-  { level: 2, name: 'Wi-Fi Public', cost: 1250, energy: 5, income: 25, icon: '📡' },
-  { level: 3, name: 'Switch 100Mb', cost: 3100, energy: 5, income: 50, icon: '📦' },
-  { level: 4, name: 'Fibre Optique', cost: 7800, energy: 5, income: 100, icon: '💡' },
-  { level: 5, name: '5G Privée', cost: 19500, energy: 5, income: 200, icon: '📶' },
-  { level: 6, name: 'Cloud Local', cost: 48000, energy: 5, income: 400, icon: '☁️' },
-  { level: 7, name: 'Satellite Link', cost: 120000, energy: 5, income: 800, icon: '🛰️' },
-  { level: 8, name: 'Réseau Neuronal', cost: 300000, energy: 5, income: 1600, icon: '🧠' },
-  { level: 9, name: 'Télépathie', cost: 750000, energy: 5, income: 3200, icon: '💜' },
+  { level: 1, name: 'Câble Ethernet', cost: 500, energy: 5, income: 10, icon: '🔵', techReq: 'C3' },
+  { level: 2, name: 'Wi-Fi Public', cost: 1250, energy: 5, income: 25, icon: '📡', techReq: 'C3' },
+  { level: 3, name: 'Switch 100Mb', cost: 3100, energy: 5, income: 50, icon: '📦', techReq: 'C5' },
+  { level: 4, name: 'Fibre Optique', cost: 7800, energy: 5, income: 100, icon: '💡', techReq: 'C6' },
+  { level: 5, name: '5G Privée', cost: 19500, energy: 5, income: 200, icon: '📶', techReq: 'C6' },
+  { level: 6, name: 'Cloud Local', cost: 48000, energy: 5, income: 400, icon: '☁️', techReq: 'C8' },
+  { level: 7, name: 'Satellite Link', cost: 120000, energy: 5, income: 800, icon: '🛰️', techReq: 'C8' },
+  { level: 8, name: 'Réseau Neuronal', cost: 300000, energy: 5, income: 1600, icon: '🧠', techReq: 'T_QUANTUM' },
+  { level: 9, name: 'Télépathie', cost: 750000, energy: 5, income: 3200, icon: '💜', techReq: 'T_QUANTUM' },
   {
     level: 10,
     name: 'Internet Galactique',
@@ -483,6 +705,7 @@ export const NETWORK_EQUIPMENT: NetworkEquipment[] = [
     energy: 5,
     income: 6400,
     icon: '🌍',
+    techReq: 'T_QUANTUM',
   },
 ]
 
@@ -494,19 +717,20 @@ export interface Teacher {
   energy: number
   income: number
   icon: string
+  techReq?: string
 }
 
 export const TEACHERS: Teacher[] = [
-  { level: 1, name: 'Surveillant', cost: 2500, energy: 1, income: 150, icon: '🪑' },
-  { level: 2, name: 'Vacataire', cost: 4500, energy: 2, income: 300, icon: '📄' },
-  { level: 3, name: "Instit'", cost: 8500, energy: 2, income: 600, icon: '📝' },
-  { level: 4, name: 'Professeur Certifié', cost: 18000, energy: 3, income: 1300, icon: '👔' },
-  { level: 5, name: 'Chef de Projet', cost: 38000, energy: 4, income: 3000, icon: '💻' },
-  { level: 6, name: 'Docteur en IT', cost: 85000, energy: 5, income: 7000, icon: '🥼' },
-  { level: 7, name: 'Conférencier Star', cost: 200000, energy: 6, income: 18000, icon: '🎤' },
-  { level: 8, name: 'Génie Solitaire', cost: 500000, energy: 8, income: 45000, icon: '🧢' },
-  { level: 9, name: 'Oracle Numérique', cost: 1200000, energy: 10, income: 120000, icon: '🥽' },
-  { level: 10, name: 'Entité I.A.', cost: 3000000, energy: 15, income: 350000, icon: '✨' },
+  { level: 1, name: 'Surveillant', cost: 2500, energy: 1, income: 150, icon: '🪑', techReq: 'C1' },
+  { level: 2, name: 'Vacataire', cost: 4500, energy: 2, income: 300, icon: '📄', techReq: 'C1' },
+  { level: 3, name: "Instit'", cost: 8500, energy: 2, income: 600, icon: '📝', techReq: 'C4' },
+  { level: 4, name: 'Professeur Certifié', cost: 18000, energy: 3, income: 1300, icon: '👔', techReq: 'C4' },
+  { level: 5, name: 'Chef de Projet', cost: 38000, energy: 4, income: 3000, icon: '💻', techReq: 'C4' },
+  { level: 6, name: 'Docteur en IT', cost: 85000, energy: 5, income: 7000, icon: '🥼', techReq: 'C8' },
+  { level: 7, name: 'Conférencier Star', cost: 200000, energy: 6, income: 18000, icon: '🎤', techReq: 'C8' },
+  { level: 8, name: 'Génie Solitaire', cost: 500000, energy: 8, income: 45000, icon: '🧢', techReq: 'C8' },
+  { level: 9, name: 'Oracle Numérique', cost: 1200000, energy: 10, income: 120000, icon: '🥽', techReq: 'T_QUANTUM' },
+  { level: 10, name: 'Entité I.A.', cost: 3000000, energy: 15, income: 350000, icon: '✨', techReq: 'T_QUANTUM' },
 ]
 
 // --- 3.5. COOLING SYSTEMS (Server Room) ---
@@ -611,13 +835,14 @@ export interface GymLevel {
   name: string
   cost: number
   description: string
+  techReq?: string
 }
 
 export const GYM_LEVELS: GymLevel[] = [
-  { level: 1, name: 'Profilage', cost: 0, description: 'Définissez votre profil sportif' },
-  { level: 2, name: 'Coaching', cost: 2000, description: 'Instructions personnalisées' },
-  { level: 3, name: 'Visuel', cost: 5000, description: 'Démonstrations animées' },
-  { level: 4, name: 'Monétisation', cost: 10000, description: 'Partenariats commerciaux' },
+  { level: 1, name: 'Profilage', cost: 0, description: 'Définissez votre profil sportif', techReq: 'G1' },
+  { level: 2, name: 'Coaching', cost: 2000, description: 'Instructions personnalisées', techReq: 'G2' },
+  { level: 3, name: 'Visuel', cost: 5000, description: 'Démonstrations animées', techReq: 'G4' },
+  { level: 4, name: 'Monétisation', cost: 10000, description: 'Partenariats commerciaux', techReq: 'G5' },
 ]
 
 export const GYM_QUESTIONS = [
