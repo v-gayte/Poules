@@ -12,9 +12,10 @@ export class MainScene extends Phaser.Scene {
   private unsubscribe: () => void;
   private students: Phaser.GameObjects.Sprite[] = [];
 
+
   constructor() {
     super('MainScene');
-    this.unsubscribe = () => {};
+    this.unsubscribe = () => { };
   }
 
   preload() {
@@ -27,14 +28,14 @@ export class MainScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor('#1a202c');
-    
+
     const map = this.make.tilemap({ key: 'map' });
     const tileset = map.addTilesetImage('CoolSchool_tileset', 'tiles');
 
     if (tileset) {
-        map.layers.forEach((_, index) => {
-            map.createLayer(index, tileset, 0, 0);
-        });
+      map.layers.forEach((_, index) => {
+        map.createLayer(index, tileset, 0, 0);
+      });
     }
 
     // Center camera and zoom out
@@ -56,51 +57,53 @@ export class MainScene extends Phaser.Scene {
 
     // Input handling
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-        if (pointer.button === 0) { // Left click for interaction
-            const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-            const x = Math.floor(worldPoint.x / this.gridSize);
-            const y = Math.floor(worldPoint.y / this.gridSize);
-            
-            const state = useGameStore.getState();
-            
-            const room = state.rooms.find(r => {
-                const config = ROOMS[r.type as keyof typeof ROOMS];
-                return x >= r.x && x < r.x + config.width && y >= r.y && y < r.y + config.height;
-            });
-            
-            if (room) {
-                if (room.unlocked) {
-                    state.setInspectedRoomId(room.id);
-                } else {
-                    state.unlockRoom(room.id);
-                }
-            } else {
-                state.setInspectedRoomId(null);
-            }
+      if (pointer.button === 0) { // Left click for interaction
+        const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+        const x = Math.floor(worldPoint.x / this.gridSize);
+        const y = Math.floor(worldPoint.y / this.gridSize);
+
+        const state = useGameStore.getState();
+
+        const room = state.rooms.find(r => {
+          const config = ROOMS[r.type as keyof typeof ROOMS];
+          return x >= r.x && x < r.x + config.width && y >= r.y && y < r.y + config.height;
+        });
+
+        if (room) {
+          if (room.unlocked) {
+            state.setInspectedRoomId(room.id);
+          } else {
+            state.unlockRoom(room.id);
+          }
+        } else {
+          state.setInspectedRoomId(null);
         }
+      }
     });
 
     // Camera Panning
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-        if (pointer.isDown) {
-            this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
-            this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
-        }
+      if (pointer.isDown) {
+        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
+        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
+      }
     });
 
     // Zoom
     this.input.on('wheel', (pointer: Phaser.Input.Pointer, gameObjects: any, deltaX: number, deltaY: number, deltaZ: number) => {
-        const zoom = this.cameras.main.zoom - deltaY * 0.001;
-        this.cameras.main.setZoom(Phaser.Math.Clamp(zoom, 0.2, 2));
+      const zoom = this.cameras.main.zoom - deltaY * 0.001;
+      this.cameras.main.setZoom(Phaser.Math.Clamp(zoom, 0.2, 2));
     });
 
     // Student Loop
     this.time.addEvent({
-        delay: 2000, // Move every 2 seconds
-        callback: () => this.moveStudents(mapWidth, mapHeight),
-        callbackScope: this,
-        loop: true
+      delay: 2000,
+      callback: () => this.moveStudents(mapWidth, mapHeight),
+      callbackScope: this,
+      loop: true
     });
+
+
   }
 
   drawGrid() {
@@ -147,18 +150,18 @@ export class MainScene extends Phaser.Scene {
         { fontSize: '10px', color: '#ffffff' }
       );
       text.setName('room');
-      
+
       if (!room.unlocked) {
-          const costText = this.add.text(
-            pixelX + pixelW / 2,
-            pixelY + pixelH / 2 + 20,
-            `$${room.cost}`,
-            { fontSize: '12px', color: '#ffff00' }
-          );
-          costText.setOrigin(0.5);
-          costText.setName('room');
+        const costText = this.add.text(
+          pixelX + pixelW / 2,
+          pixelY + pixelH / 2 + 20,
+          `$${room.cost}`,
+          { fontSize: '12px', color: '#ffff00' }
+        );
+        costText.setOrigin(0.5);
+        costText.setName('room');
       } else {
-          rect.setAlpha(1);
+        rect.setAlpha(1);
       }
     });
   }
@@ -166,7 +169,7 @@ export class MainScene extends Phaser.Scene {
   updateStudents(count: number) {
     if (!this.sys || !this.sys.isActive()) return;
     const visualCount = Math.min(count, 50);
-    
+
     if (this.students.length < visualCount) {
         const toAdd = visualCount - this.students.length;
         for (let i = 0; i < toAdd; i++) {
@@ -180,33 +183,35 @@ export class MainScene extends Phaser.Scene {
             this.students.push(student);
         }
     } else if (this.students.length > visualCount) {
-        const toRemove = this.students.length - visualCount;
-        for (let i = 0; i < toRemove; i++) {
-            const student = this.students.pop();
-            student?.destroy();
-        }
+      const toRemove = this.students.length - visualCount;
+      for (let i = 0; i < toRemove; i++) {
+        const student = this.students.pop();
+        student?.destroy();
+      }
     }
   }
 
   moveStudents(mapWidth: number, mapHeight: number) {
     this.students.forEach(student => {
-        const dx = Phaser.Math.Between(-1, 1) * this.gridSize;
-        const dy = Phaser.Math.Between(-1, 1) * this.gridSize;
-        
-        const newX = student.x + dx;
-        const newY = student.y + dy;
+      const dx = Phaser.Math.Between(-1, 1) * this.gridSize;
+      const dy = Phaser.Math.Between(-1, 1) * this.gridSize;
 
-        if (newX >= 0 && newX < mapWidth && newY >= 0 && newY < mapHeight) {
-            this.tweens.add({
-                targets: student,
-                x: newX,
-                y: newY,
-                duration: 1000,
-                ease: 'Linear'
-            });
-        }
+      const newX = student.x + dx;
+      const newY = student.y + dy;
+
+      if (newX >= 0 && newX < mapWidth && newY >= 0 && newY < mapHeight) {
+        this.tweens.add({
+          targets: student,
+          x: newX,
+          y: newY,
+          duration: 1000,
+          ease: 'Linear'
+        });
+      }
     });
   }
+
+
 
   destroy() {
     this.unsubscribe();
