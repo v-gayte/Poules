@@ -273,6 +273,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       globalModifiers,
       generatorLevel,
       setErrorMessage,
+      unlockedTechs,
     } = get()
 
     // Level 1: Add first network slot (unlocks network section)
@@ -281,6 +282,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
       if (money < cost) return
+
+      // Tech Check
+      if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
+        setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
+        return
+      }
 
       // Add the first network slot
       const newNetworkSlots = [null]
@@ -387,7 +394,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   upgradeGym: () => {
-    const { money, gymLevel, gymProfile, globalModifiers, maxCo2 } = get()
+    const { money, gymLevel, gymProfile, globalModifiers, maxCo2, unlockedTechs, setErrorMessage } = get()
     if (gymLevel >= 4) return
 
     if (gymLevel === 1 && !gymProfile) return
@@ -396,6 +403,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = nextLevel.cost * (1 - globalModifiers.costReduction)
 
     if (money >= cost) {
+      if (nextLevel.techReq && !unlockedTechs.includes(nextLevel.techReq)) {
+        setErrorMessage(`Recherche requise : ${nextLevel.techReq}`)
+        return
+      }
+
       // Increase CO2 capacity proportionally to upgrade cost (10% of cost as additional capacity)
       const co2Increase = Math.floor(cost * 0.1)
       const newMaxCo2 = maxCo2 + co2Increase
@@ -453,6 +465,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const tech = TECH_TREE.find((t) => t.id === techId)
     if (!tech) return
 
+    // Check if requirements are met
+    const requirementsMet = tech.reqs.every((reqId) => unlockedTechs.includes(reqId))
+    if (!requirementsMet) return
+
     if (research >= tech.cost) {
       // Apply effects
       const newModifiers = { ...globalModifiers }
@@ -473,7 +489,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   buyServer: (typeId) => {
-    const { money, serverSlots, serverRoomLevel, globalModifiers } = get()
+    const { money, serverSlots, serverRoomLevel, globalModifiers, unlockedTechs, setErrorMessage } = get()
 
     const emptyIndex = serverSlots.findIndex((s) => s === null)
     if (emptyIndex === -1) return
@@ -485,6 +501,12 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (serverRoomLevel < assetConfig.minRoomLevel) return
     if (money < cost) return
+
+    // Tech Check
+    if (assetConfig.techReq && !unlockedTechs.includes(assetConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${assetConfig.techReq}`)
+      return
+    }
 
     const newSlots = [...serverSlots]
     newSlots[emptyIndex] = { typeId, grade: 1 }
@@ -525,9 +547,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       classroomSlots,
       networkSlots,
       globalModifiers,
-      serverRoomLevel,
       generatorLevel,
+      teacherSlots, // Added missing destructuring
       setErrorMessage,
+      unlockedTechs,
     } = get()
     if (classroomSlots[slotIndex]) return
 
@@ -535,6 +558,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = pcConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
+
+    // Tech Check
+    if (pcConfig.techReq && !unlockedTechs.includes(pcConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${pcConfig.techReq}`)
+      return
+    }
+
+    // Tech Check
+    if (pcConfig.techReq && !unlockedTechs.includes(pcConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${pcConfig.techReq}`)
+      return
+    }
 
     // Calculate energy after purchase (PCs + Network)
     let totalEnergy = 0
@@ -588,9 +623,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       classroomSlots,
       networkSlots,
       globalModifiers,
-      serverRoomLevel,
       generatorLevel,
       setErrorMessage,
+      unlockedTechs,
     } = get()
     const slot = classroomSlots[slotIndex]
     if (!slot) return
@@ -600,6 +635,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
+
+    // Tech Check
+    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
+      return
+    }
 
     // Calculate energy after upgrade (PCs + Network)
     let totalEnergy = 0
@@ -650,6 +691,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       generatorLevel,
       classroomSlots,
       setErrorMessage,
+      unlockedTechs,
     } = get()
     if (networkSlots[slotIndex]) return
 
@@ -657,6 +699,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = networkConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
+
+    // Tech Check
+    if (networkConfig.techReq && !unlockedTechs.includes(networkConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${networkConfig.techReq}`)
+      return
+    }
 
     // Calculate energy after purchase
     let totalEnergy = 0
@@ -713,6 +761,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       generatorLevel,
       classroomSlots,
       setErrorMessage,
+      unlockedTechs,
     } = get()
     const slot = networkSlots[slotIndex]
     if (!slot) return
@@ -722,6 +771,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
+
+    // Tech Check
+    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
+      return
+    }
 
     // Calculate energy after upgrade
     let totalEnergy = 0
@@ -780,6 +835,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       classroomSlots,
       networkSlots,
       setErrorMessage,
+      unlockedTechs,
     } = get()
     if (teacherSlots[slotIndex]) return
 
@@ -787,6 +843,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = teacherConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
+
+    // Tech Check
+    if (teacherConfig.techReq && !unlockedTechs.includes(teacherConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${teacherConfig.techReq}`)
+      return
+    }
 
     // Calculate energy after purchase
     let totalEnergy = 0
@@ -843,6 +905,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       classroomSlots,
       networkSlots,
       setErrorMessage,
+      unlockedTechs,
     } = get()
     const slot = teacherSlots[slotIndex]
     if (!slot) return
@@ -852,6 +915,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     const cost = nextLevelConfig.cost * (1 - globalModifiers.costReduction)
 
     if (money < cost) return
+
+    // Tech Check
+    if (nextLevelConfig.techReq && !unlockedTechs.includes(nextLevelConfig.techReq)) {
+      setErrorMessage(`Recherche requise : ${nextLevelConfig.techReq}`)
+      return
+    }
 
     // Calculate energy after upgrade
     let totalEnergy = 0

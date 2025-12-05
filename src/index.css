@@ -7,3 +7,23 @@ body {
   padding: 0;
   background-color: #111827;
 }
+
+/* Custom Scrollbar for Tech Tree */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0a0a14;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 5px;
+  border: 2px solid #0a0a14;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
