@@ -888,11 +888,6 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
 
     const techReq = nextConfig?.techReq ? TECH_TREE.find((t) => t.id === nextConfig.techReq) : null
     const isTechUnlocked = techReq ? store.unlockedTechs.includes(techReq.id) : true
-    const canUpgrade =
-      nextConfig &&
-      store.money >= nextConfig.cost * (1 - store.globalModifiers.costReduction) &&
-      isTechUnlocked &&
-      store.energyCapacity >= nextConfig.energyReq
 
     return (
       <div className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-6 flex gap-8 z-20 h-96 overflow-hidden">
@@ -905,7 +900,7 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
 
           <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
             <div className="text-sm text-gray-500">Server Capacity</div>
-            <div className="text-3xl font-bold text-white">30 Slots</div>
+            <div className="text-3xl font-bold text-white">{config.slots} Slots</div>
           </div>
 
           {store.coolingSlots.length > 0 && (
@@ -929,8 +924,38 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
             </div>
           </div>
 
-          {store.coolingSlots.length === 0 ? (
-            nextConfig ? (
+          {nextConfig ? (
+            <div className="bg-gray-900 p-4 rounded border border-gray-600 mb-4">
+              <h3 className="font-bold text-gray-300 mb-2">Next Upgrade: {nextConfig.name}</h3>
+              <ul className="text-sm space-y-1 mb-3">
+                <li
+                  className={
+                    store.money >= nextConfig.cost * (1 - store.globalModifiers.costReduction)
+                      ? 'text-green-400'
+                      : 'text-red-400'
+                  }
+                >
+                  • Cost: $
+                  {(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()}
+                </li>
+                <li
+                  className={
+                    store.energyCapacity >= nextConfig.energyReq ? 'text-green-400' : 'text-red-400'
+                  }
+                >
+                  • Requires Energy Cap: {nextConfig.energyReq}⚡ (Have {store.energyCapacity}⚡)
+                </li>
+                {techReq && (
+                  <li className={isTechUnlocked ? 'text-green-400' : 'text-red-400'}>
+                    • Tech: {techReq.name}
+                  </li>
+                )}
+                <li className="text-blue-400">
+                  • Slots: {config.slots} → {nextConfig.slots}
+                </li>
+                {level === 1 && <li className="text-cyan-400">• Unlocks: Cooling System</li>}
+                {level === 2 && <li className="text-cyan-400">• Unlocks: Backup System</li>}
+              </ul>
               <button
                 onClick={store.upgradeServerRoom}
                 disabled={
@@ -938,34 +963,13 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                   (nextConfig.techReq && !isTechUnlocked) ||
                   store.energyCapacity < nextConfig.energyReq
                 }
-                className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
+                className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
               >
-                Add Cooling Slot ($
-                {(nextConfig.cost * (1 - store.globalModifiers.costReduction)).toLocaleString()})
+                Upgrade Room
               </button>
-            ) : (
-              <div className="text-green-400 font-bold">MAX LEVEL REACHED</div>
-            )
-          ) : store.backupSlots.length < 3 ? (
-            <button
-              onClick={store.upgradeServerRoom}
-              disabled={
-                store.money <
-                (nextConfig
-                  ? nextConfig.cost * (1 - store.globalModifiers.costReduction)
-                  : config.cost * (1 - store.globalModifiers.costReduction))
-              }
-              className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-bold transition-colors"
-            >
-              Add Backup Slot ($
-              {(
-                (nextConfig ? nextConfig.cost : config.cost) *
-                (1 - store.globalModifiers.costReduction)
-              ).toLocaleString()}
-              )
-            </button>
+            </div>
           ) : (
-            <div className="text-green-400 font-bold">SALLE AU MAXIMUM</div>
+            <div className="text-blue-400 font-bold mb-4">MAX LEVEL REACHED</div>
           )}
         </div>
 
@@ -980,8 +984,8 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
             {store.serverSlots.slice(0, config.slots).map((slot, index) => {
               if (slot) {
                 const asset = SERVER_ASSETS[slot.typeId]
-                const grade = asset.grades.find((g) => g.grade === slot.grade)!
-                const nextGrade = asset.grades.find((g) => g.grade === slot.grade + 1)
+                const levelConfig = asset.levels.find((l) => l.level === slot.level)!
+                const nextLevelConfig = asset.levels.find((l) => l.level === slot.level + 1)
 
                 return (
                   <div
@@ -990,34 +994,34 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                   >
                     <div className="font-bold text-xs text-white truncate">{asset.name}</div>
                     <div className="text-[10px] text-blue-300">
-                      {grade.name} (G{slot.grade})
+                      {levelConfig.name} (Lvl {slot.level})
                     </div>
-                    <div className="text-[10px] text-green-400">+${grade.income}/t</div>
-                    <div className="text-[10px] text-red-400">+{grade.co2} CO₂</div>
+                    <div className="text-[10px] text-green-400">+${levelConfig.income}/s</div>
+                    <div className="text-[10px] text-red-400">+{levelConfig.co2} CO₂</div>
 
-                    {nextGrade && (
+                    {nextLevelConfig && (
                       <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 z-10">
                         <div className="text-[10px] text-gray-300 mb-1">
-                          Upgrade to {nextGrade.name}
+                          Upgrade to {nextLevelConfig.name}
                         </div>
                         <div className="text-[10px] text-green-400 mb-1">
-                          +${nextGrade.income - grade.income}/t
+                          +${nextLevelConfig.income - levelConfig.income}/s
                         </div>
                         <div className="text-[10px] text-red-400 mb-1">
-                          {nextGrade.co2 - grade.co2 > 0 ? '+' : ''}
-                          {nextGrade.co2 - grade.co2} CO₂
+                          {nextLevelConfig.co2 - levelConfig.co2 > 0 ? '+' : ''}
+                          {nextLevelConfig.co2 - levelConfig.co2} CO₂
                         </div>
                         <button
                           onClick={() => store.upgradeServer(index)}
                           disabled={
                             store.money <
-                            nextGrade.upgradeCost * (1 - store.globalModifiers.costReduction)
+                            nextLevelConfig.cost * (1 - store.globalModifiers.costReduction)
                           }
                           className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 rounded text-[10px] font-bold w-full"
                         >
                           $
                           {(
-                            nextGrade.upgradeCost *
+                            nextLevelConfig.cost *
                             (1 - store.globalModifiers.costReduction)
                           ).toLocaleString()}
                         </button>
@@ -1036,25 +1040,21 @@ export const RoomDetails = ({ roomId, onClose }: { roomId: string; onClose: () =
                     <div className="flex flex-col gap-1 w-full mt-1">
                       {Object.values(SERVER_ASSETS)
                         .filter((asset) => store.serverRoomLevel >= asset.minRoomLevel)
-                        .map((asset) => (
-                          <button
-                            key={asset.id}
-                            onClick={() => store.buyServer(asset.id)}
-                            disabled={
-                              store.money <
-                              asset.baseCost * (1 - store.globalModifiers.costReduction)
-                            }
-                            className="px-2 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-[10px] rounded text-left truncate"
-                            title={`${asset.name} ($${(asset.baseCost * (1 - store.globalModifiers.costReduction)).toLocaleString()})`}
-                          >
-                            {asset.name} ($
-                            {(
-                              asset.baseCost *
-                              (1 - store.globalModifiers.costReduction)
-                            ).toLocaleString()}
-                            )
-                          </button>
-                        ))}
+                        .map((asset) => {
+                          const firstLevel = asset.levels[0]
+                          const cost = firstLevel.cost * (1 - store.globalModifiers.costReduction)
+                          return (
+                            <button
+                              key={asset.id}
+                              onClick={() => store.buyServer(asset.id)}
+                              disabled={store.money < cost}
+                              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-[10px] rounded text-left truncate"
+                              title={`${asset.name} ($${cost.toLocaleString()})`}
+                            >
+                              {asset.name} (${cost.toLocaleString()})
+                            </button>
+                          )
+                        })}
                     </div>
                   </div>
                 )
