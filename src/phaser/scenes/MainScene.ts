@@ -1,147 +1,182 @@
-import Phaser from 'phaser'
-import { useGameStore } from '../../stores/gameStore'
-import type { Building } from '../../types'
+import Phaser from 'phaser';
+import { useGameStore } from '../../stores/useGameStore';
+import { ROOMS } from '../../config/gameConfig';
 
-/**
- * Scene principale de Phaser
- * Gère uniquement l'affichage de la map et des bâtiments
- */
-export default class MainScene extends Phaser.Scene {
-  private buildings: Phaser.GameObjects.Group
-  private gridGraphics?: Phaser.GameObjects.Graphics
-  private gridSize = 64 // Taille d'une case en pixels
+export class MainScene extends Phaser.Scene {
+  private gridSize = 48;
+  private unsubscribe: () => void;
+  private students: Phaser.GameObjects.Text[] = [];
 
   constructor() {
-    super({ key: 'MainScene' })
+    super('MainScene');
+    this.unsubscribe = () => {};
   }
 
-  create(): void {
-    // Créer la grille
-    this.createGrid()
+  create() {
+    this.cameras.main.setBackgroundColor('#1a202c');
+    this.drawGrid();
 
-    // Groupe pour les bâtiments
-    this.buildings = this.add.group()
+    // Subscribe to store changes
+    this.unsubscribe = useGameStore.subscribe((state) => {
+      this.renderRooms(state.rooms);
+      this.updateStudents(state.studentCount);
+    });
 
-    // Contrôles de la caméra (flèches directionnelles)
-    const cursors = this.input.keyboard?.createCursorKeys()
-    if (cursors) {
-      // Contrôle manuel de la caméra
-      this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-        const speed = 10
-        if (event.key === 'ArrowLeft') {
-          this.cameras.main.scrollX -= speed
-        } else if (event.key === 'ArrowRight') {
-          this.cameras.main.scrollX += speed
-        } else if (event.key === 'ArrowUp') {
-          this.cameras.main.scrollY -= speed
-        } else if (event.key === 'ArrowDown') {
-          this.cameras.main.scrollY += speed
+    // Initial render
+    const state = useGameStore.getState();
+    this.renderRooms(state.rooms);
+    this.updateStudents(state.studentCount);
+
+    // Input handling
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        const x = Math.floor(pointer.worldX / this.gridSize);
+        const y = Math.floor(pointer.worldY / this.gridSize);
+        
+        const state = useGameStore.getState();
+        
+        const room = state.rooms.find(r => {
+            const config = ROOMS[r.type];
+            return x >= r.x && x < r.x + config.width && y >= r.y && y < r.y + config.height;
+        });
+        
+        if (room) {
+            if (room.unlocked) {
+                state.setInspectedRoomId(room.id);
+            } else {
+                state.unlockRoom(room.id);
+            }
+        } else {
+            state.setInspectedRoomId(null);
         }
-      })
-    }
+    });
 
-    // Zoom avec la molette
-    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _deltaX: number, deltaY: number) => {
-      const currentZoom = this.cameras.main.zoom
-      const newZoom = Phaser.Math.Clamp(currentZoom - deltaY * 0.001, 0.5, 2)
-      this.cameras.main.setZoom(newZoom)
-    })
-
-    // Position initiale de la caméra
-    this.cameras.main.setScroll(0, 0)
-
-    // Écouter les changements du store pour mettre à jour l'affichage
-    this.updateBuildingsDisplay()
-
-    // S'abonner aux changements du store (via un intervalle pour l'instant)
-    // Note: Dans un vrai projet, vous pourriez utiliser un système d'événements
+    // Student Loop
     this.time.addEvent({
-      delay: 100,
-      callback: () => {
-        this.updateBuildingsDisplay()
-      },
-      loop: true,
-    })
+        delay: 2000, // Move every 2 seconds
+        callback: this.moveStudents,
+        callbackScope: this,
+        loop: true
+    });
   }
 
-  private createGrid(): void {
-    this.gridGraphics = this.add.graphics()
-    this.drawGrid()
-  }
+  drawGrid() {
+    const graphics = this.add.graphics();
+    graphics.lineStyle(1, 0x2d3748, 0.5);
 
-  private drawGrid(): void {
-    if (!this.gridGraphics) return
+    const width = this.scale.width;
+    const height = this.scale.height;
 
-    const camera = this.cameras.main
-
-    this.gridGraphics.clear()
-    this.gridGraphics.lineStyle(1, 0x34495e, 0.3)
-
-    // Calculer les limites visibles de la caméra
-    const startX = Math.floor(camera.worldView.x / this.gridSize) * this.gridSize
-    const startY = Math.floor(camera.worldView.y / this.gridSize) * this.gridSize
-    const endX = camera.worldView.x + camera.worldView.width
-    const endY = camera.worldView.y + camera.worldView.height
-
-    // Dessiner les lignes verticales
-    for (let x = startX; x <= endX; x += this.gridSize) {
-      this.gridGraphics.moveTo(x, startY)
-      this.gridGraphics.lineTo(x, endY)
+    for (let x = 0; x < width; x += this.gridSize) {
+      graphics.moveTo(x, 0);
+      graphics.lineTo(x, height);
     }
 
-    // Dessiner les lignes horizontales
-    for (let y = startY; y <= endY; y += this.gridSize) {
-      this.gridGraphics.moveTo(startX, y)
-      this.gridGraphics.lineTo(endX, y)
+    for (let y = 0; y < height; y += this.gridSize) {
+      graphics.moveTo(0, y);
+      graphics.lineTo(width, y);
     }
-
-    this.gridGraphics.strokePath()
+    graphics.strokePath();
   }
 
-  private updateBuildingsDisplay(): void {
-    const store = useGameStore.getState()
+  renderRooms(rooms: any[]) {
+    if (!this.sys || !this.sys.isActive()) return;
+    this.children.list.filter(child => child.name === 'room').forEach(child => child.destroy());
+
+    rooms.forEach(room => {
+      const config = ROOMS[room.type];
+      if (!config) return;
+
+      const pixelX = room.x * this.gridSize;
+      const pixelY = room.y * this.gridSize;
+      const pixelW = config.width * this.gridSize;
+      const pixelH = config.height * this.gridSize;
+
+      const rect = this.add.rectangle(
+        pixelX + pixelW / 2,
+        pixelY + pixelH / 2,
+        pixelW - 4,
+        pixelH - 4,
+        config.color
+      );
+      rect.setName('room');
+      rect.setStrokeStyle(2, 0xffffff);
+      rect.setAlpha(room.unlocked ? 1 : 0.3);
+
+      const emoji = this.add.text(
+        pixelX + pixelW / 2,
+        pixelY + pixelH / 2,
+        room.unlocked ? config.emoji : '🔒',
+        { fontSize: '32px' }
+      );
+      emoji.setOrigin(0.5);
+      emoji.setName('room');
+
+      const text = this.add.text(
+        pixelX + 4,
+        pixelY + 4,
+        config.name,
+        { fontSize: '10px', color: '#ffffff' }
+      );
+      text.setName('room');
+      
+      if (!room.unlocked) {
+          const costText = this.add.text(
+            pixelX + pixelW / 2,
+            pixelY + pixelH / 2 + 20,
+            `$${room.cost}`,
+            { fontSize: '12px', color: '#ffff00' }
+          );
+          costText.setOrigin(0.5);
+          costText.setName('room');
+      } else {
+          // Check if this room was just unlocked (simple check: if it has no tween yet?)
+          // For now, just ensuring unlocked rooms are full alpha
+          rect.setAlpha(1);
+      }
+    });
+  }
+
+  updateStudents(count: number) {
+    if (!this.sys || !this.sys.isActive()) return;
+    // Simple logic: If count > current, add. If count < current, remove.
+    // For performance, cap visual students at say 50.
+    const visualCount = Math.min(count, 50);
     
-    // Supprimer tous les bâtiments existants
-    this.buildings.clear(true, true)
-
-    // Créer les sprites pour chaque bâtiment
-    store.buildings.forEach((building) => {
-      this.createBuildingSprite(building)
-    })
-  }
-
-  private createBuildingSprite(building: Building): void {
-    // Position en pixels
-    const x = building.x * this.gridSize + this.gridSize / 2
-    const y = building.y * this.gridSize + this.gridSize / 2
-
-    // Créer un rectangle temporaire (à remplacer par de vrais sprites)
-    const sprite = this.add.rectangle(x, y, this.gridSize - 4, this.gridSize - 4, 0x3498db)
-    sprite.setInteractive()
-    sprite.setData('buildingId', building.id)
-    sprite.setData('building', building)
-
-    // Ajouter un texte pour le niveau
-    const levelText = this.add.text(x, y, building.level.toString(), {
-      fontSize: '16px',
-      color: '#ffffff',
-    })
-    levelText.setOrigin(0.5)
-
-    this.buildings.add([sprite, levelText])
-
-    // Événement de clic
-    sprite.on('pointerdown', () => {
-      console.log('Building clicked:', building)
-      // Ici, vous pouvez ouvrir un menu d'upgrade via React
-    })
-  }
-
-  update(): void {
-    // Redessiner la grille si la caméra bouge
-    if (this.gridGraphics) {
-      this.drawGrid()
+    if (this.students.length < visualCount) {
+        const toAdd = visualCount - this.students.length;
+        for (let i = 0; i < toAdd; i++) {
+            const student = this.add.text(0, 0, '🎓', { fontSize: '16px' });
+            // Random start pos
+            student.x = Phaser.Math.Between(0, this.scale.width);
+            student.y = Phaser.Math.Between(0, this.scale.height);
+            this.students.push(student);
+        }
+    } else if (this.students.length > visualCount) {
+        const toRemove = this.students.length - visualCount;
+        for (let i = 0; i < toRemove; i++) {
+            const student = this.students.pop();
+            student?.destroy();
+        }
     }
+  }
+
+  moveStudents() {
+    this.students.forEach(student => {
+        // Random walk
+        const dx = Phaser.Math.Between(-1, 1) * this.gridSize;
+        const dy = Phaser.Math.Between(-1, 1) * this.gridSize;
+        
+        this.tweens.add({
+            targets: student,
+            x: student.x + dx,
+            y: student.y + dy,
+            duration: 1000,
+            ease: 'Linear'
+        });
+    });
+  }
+
+  destroy() {
+    this.unsubscribe();
   }
 }
-
